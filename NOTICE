@@ -1,0 +1,5 @@
+This project is a configured packaging of bareiron for ESP32
+(1 player, 1-chunk view distance, SoftAP by default).
+
+Upstream: https://github.com/p2r3/bareiron
+License:  GNU General Public License v3.0 (see LICENSE)
