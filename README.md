@@ -163,7 +163,7 @@ Then join `localhost:25565` with Minecraft 1.21.8.
 | `WIFI_SOFTAP` | off | Off = join your Wi‑Fi; on = ESP hotspot |
 | `WIFI_SSID` / `WIFI_PASS` | placeholders | **Set these before flashing** |
 
-After edits: `pio run -e esp32dev -t upload`.
+After edits: `pio run -e esp32-c3-supermini -t upload`.
 
 Check current config anytime:
 
