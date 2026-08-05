@@ -5,11 +5,12 @@
 #include <unistd.h>
 
 #ifdef ESP_PLATFORM
- // SoftAP (default): ESP32 creates its own Wi‑Fi hotspot for local play.
- // Comment out WIFI_SOFTAP to join an existing network instead (station mode).
- #define WIFI_SOFTAP
- #define WIFI_SSID "ESP32-MC"
- #define WIFI_PASS "minecraft"
+ // Station mode (default): ESP32 joins YOUR Wi‑Fi so Ethernet PCs on the same
+ // LAN can reach the server. Put your router SSID/password below, then flash.
+ // Uncomment WIFI_SOFTAP only if you want the ESP32 to create its own hotspot.
+ // #define WIFI_SOFTAP
+ #define WIFI_SSID "YOUR_WIFI_SSID"
+ #define WIFI_PASS "YOUR_WIFI_PASSWORD"
  void task_yield ();
 #else
  #define task_yield();
