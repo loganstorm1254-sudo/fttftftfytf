@@ -751,23 +751,36 @@ static void wifi_event_handler (void *arg, esp_event_base_t event_base, int32_t 
 #ifdef WIFI_SOFTAP
   if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
     printf("SoftAP \"%s\" up. Connect Wi‑Fi, then join 192.168.4.1:%d\n", WIFI_SSID, PORT);
+    fflush(stdout);
     start_minecraft_server();
   }
 #else
   if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+    printf("Wi‑Fi started, connecting to \"%s\"...\n", WIFI_SSID);
+    fflush(stdout);
     esp_wifi_connect();
   } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    wifi_event_sta_disconnected_t *disc = (wifi_event_sta_disconnected_t *)event_data;
+    printf("Wi‑Fi disconnected (reason %d). Retrying \"%s\"...\n", disc->reason, WIFI_SSID);
+    printf("  Check WIFI_SSID / WIFI_PASS in include/globals.h (2.4 GHz only).\n");
+    fflush(stdout);
     esp_wifi_connect();
   } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    printf("Got IP " IPSTR ", starting server on port %d...\n\n",
-           IP2STR(&event->ip_info.ip), PORT);
+    printf("\n*** Got IP " IPSTR " ***\n", IP2STR(&event->ip_info.ip));
+    printf("Join Minecraft at " IPSTR ":%d\n\n", IP2STR(&event->ip_info.ip), PORT);
+    fflush(stdout);
     start_minecraft_server();
   }
 #endif
 }
 
 void wifi_init () {
+  // Line-buffer stdout so USB Serial/JTAG prints show up promptly
+  setvbuf(stdout, NULL, _IOLBF, 0);
+  printf("\nesp32-mc boot — 1 player / 1 chunk\n");
+  fflush(stdout);
+
   nvs_flash_init();
   esp_netif_init();
   esp_event_loop_create_default();
@@ -788,6 +801,8 @@ void wifi_init () {
   wifi_config.ap.authmode = (strlen(WIFI_PASS) >= 8) ? WIFI_AUTH_WPA2_PSK : WIFI_AUTH_OPEN;
   wifi_config.ap.channel = 1;
 
+  printf("Starting SoftAP \"%s\"...\n", WIFI_SSID);
+  fflush(stdout);
   esp_wifi_set_mode(WIFI_MODE_AP);
   esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
 #else
@@ -798,10 +813,13 @@ void wifi_init () {
     .sta = {
       .ssid = WIFI_SSID,
       .password = WIFI_PASS,
-      .threshold.authmode = WIFI_AUTH_WPA2_PSK
+      // Accept WPA/WPA2; do not require WPA2-only
+      .threshold.authmode = WIFI_AUTH_WPA_WPA2_PSK
     }
   };
 
+  printf("Joining Wi‑Fi \"%s\"...\n", WIFI_SSID);
+  fflush(stdout);
   esp_wifi_set_mode(WIFI_MODE_STA);
   esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
 #endif
