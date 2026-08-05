@@ -117,6 +117,13 @@ pio device monitor
 
 **If upload fails / no COM port:** hold **BOOT**, tap **RESET**, release **BOOT**, then run upload again.
 
+**If you already built once and then changed flash settings**, clean first:
+
+```bat
+python -m platformio run -e esp32-c3-supermini -t fullclean
+python -m platformio run -e esp32-c3-supermini -t upload
+```
+
 Other boards: `-e esp32dev` or `-e esp32-s3`.
 
 ### 4. Read the ESP32’s IP from serial
