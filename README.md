@@ -6,6 +6,7 @@ Built on [bareiron](https://github.com/p2r3/bareiron) (GPL-3.0) — a minimal Mi
 
 | Setting | Value |
 |---|---|
+| Target board | **ESP32-C3 SuperMini** (default) |
 | Minecraft | Java Edition **1.21.8** (vanilla client) |
 | Players | **1** (`MAX_PLAYERS`) |
 | View distance | **0** → only the chunk you stand in |
@@ -18,9 +19,9 @@ Works when your PC is on **Ethernet**: ESP32 joins the same router over Wi‑Fi;
 
 ## What you need
 
-1. An **ESP32** board (classic / S3 / C3)
-2. A **Wi‑Fi router** the ESP32 can join (2.4 GHz — classic ESP32 has no 5 GHz)
-3. USB cable + [PlatformIO](https://platformio.org/) (VS Code extension or CLI)
+1. An **ESP32-C3 SuperMini** (or other ESP32 / S3 / C3)
+2. A **Wi‑Fi router** the ESP32 can join (**2.4 GHz** — C3 has no 5 GHz)
+3. USB-C cable + [PlatformIO](https://platformio.org/) (VS Code extension or CLI)
 4. A PC (Ethernet or Wi‑Fi) with **Minecraft Java 1.21.8** (vanilla)
 
 No Arduino sketch — this uses **ESP-IDF** only.
@@ -51,7 +52,7 @@ pip install -U platformio
 3. If `pio` still isn’t found, either:
 
 ```bat
-python -m platformio run -e esp32dev -t upload
+python -m platformio run -e esp32-c3-supermini -t upload
 ```
 
 or add this to your user **PATH**, then open a new Command Prompt:
@@ -62,11 +63,11 @@ C:\Users\Logan\.platformio\penv\Scripts
 
 (Replace `Logan` if your Windows username differs.)
 
-Also install the [CP210x](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers) or [CH340](https://github.com/WCHSoftGroup/ch34xser_tools) USB serial driver if Windows doesn’t see the ESP32 COM port.
+**ESP32-C3 SuperMini** uses native USB — usually no CP210x/CH340 driver. Windows should show a COM port like `USB Serial Device` / `USB JTAG`.
 
 ---
 
-## Quick start (ESP32 on your Wi‑Fi)
+## Quick start (ESP32-C3 SuperMini on your Wi‑Fi)
 
 ### 1. Put your Wi‑Fi credentials in
 
@@ -81,19 +82,26 @@ Replace with your real SSID and password. Leave `#define WIFI_SOFTAP` commented 
 
 ### 2. Flash the firmware
 
+Plug in the SuperMini over USB-C, then:
+
 ```bat
-pio run -e esp32dev -t upload
+pio run -e esp32-c3-supermini -t upload
 pio device monitor
 ```
 
 If `pio` isn’t on PATH:
 
 ```bat
-python -m platformio run -e esp32dev -t upload
+python -m platformio run -e esp32-c3-supermini -t upload
 python -m platformio device monitor
 ```
 
-Use `-e esp32-s3` or `-e esp32-c3` if that matches your board (`platformio.ini`).
+(`esp32-c3-supermini` is also the project default, so plain `pio run -t upload` works.)
+
+**If upload fails / no COM port:** hold **BOOT**, tap **RESET**, release **BOOT**, then run upload again.
+
+Other boards: `-e esp32dev` or `-e esp32-s3`.
+
 ### 3. Read the ESP32’s IP from serial
 
 When it joins Wi‑Fi you should see something like:
@@ -173,8 +181,8 @@ This is **not** a full vanilla server. Expect:
 - No redstone complexity, limited mobs
 - Walking far loads the *next* single chunk (still one at a time)
 - Vanilla client only — avoid Fabric/Forge for the client
-- ESP32-C3 is the tightest; classic ESP32 / S3 are more comfortable
-- Classic ESP32 is **2.4 GHz Wi‑Fi only**
+- ESP32-C3 SuperMini is tight on RAM — keep `VIEW_DISTANCE 0` / `MAX_PLAYERS 1`
+- C3 is **2.4 GHz Wi‑Fi only**
 
 Full upstream docs: https://github.com/p2r3/bareiron
 
