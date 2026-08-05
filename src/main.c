@@ -893,8 +893,8 @@ void wifi_init () {
 
   printf("Configured SSID=\"%s\" (password length %u)\n",
          WIFI_SSID, (unsigned)strlen(WIFI_PASS));
-  if (strlen(WIFI_PASS) != 11) {
-    printf("NOTE: expected password length 11 for Rogue1254!! — got %u\n",
+  if (strlen(WIFI_PASS) < 8) {
+    printf("WARNING: password length %u looks too short (WPA2 needs >= 8).\n",
            (unsigned)strlen(WIFI_PASS));
   }
   fflush(stdout);
