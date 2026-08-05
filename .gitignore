@@ -8,3 +8,4 @@ bareiron.exe
 world.bin
 __pycache__/
 *.o
+include/wifi_secrets.h

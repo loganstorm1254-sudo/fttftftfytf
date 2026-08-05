@@ -6,11 +6,22 @@
 
 #ifdef ESP_PLATFORM
  // Station mode (default): ESP32 joins YOUR Wi‑Fi so Ethernet PCs on the same
- // LAN can reach the server. Put your router SSID/password below, then flash.
+ // LAN can reach the server. Put credentials in include/wifi_secrets.h
+ // (copy from wifi_secrets.h.example). That file is gitignored so updates
+ // won't wipe your password.
  // Uncomment WIFI_SOFTAP only if you want the ESP32 to create its own hotspot.
  // #define WIFI_SOFTAP
- #define WIFI_SSID "YOUR_WIFI_SSID"
- #define WIFI_PASS "YOUR_WIFI_PASSWORD"
+ #if __has_include("wifi_secrets.h")
+  #include "wifi_secrets.h"
+ #else
+  #error Create include/wifi_secrets.h (copy wifi_secrets.h.example) with your Wi-Fi SSID/password
+ #endif
+ #ifndef WIFI_SSID
+  #error WIFI_SSID missing — edit include/wifi_secrets.h
+ #endif
+ #ifndef WIFI_PASS
+  #error WIFI_PASS missing — edit include/wifi_secrets.h
+ #endif
  void task_yield ();
 #else
  #define task_yield();
