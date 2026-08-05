@@ -27,6 +27,45 @@ No Arduino sketch — this uses **ESP-IDF** only.
 
 ---
 
+## Install PlatformIO (Windows)
+
+`pio` is not built into Windows. Pick **one** option:
+
+### Option A — VS Code (easiest)
+
+1. Install [VS Code](https://code.visualstudio.com/)
+2. Extensions → search **PlatformIO IDE** → Install
+3. File → Open Folder → this project folder
+4. Wait for PlatformIO to finish installing (bottom status bar)
+5. Use the PlatformIO toolbar: **Build** (✓) then **Upload** (→), or open a **PlatformIO** terminal and run the `pio` commands below
+
+### Option B — CLI in Command Prompt
+
+1. Install [Python 3](https://www.python.org/downloads/) — check **“Add python.exe to PATH”**
+2. Open a **new** Command Prompt and run:
+
+```bat
+pip install -U platformio
+```
+
+3. If `pio` still isn’t found, either:
+
+```bat
+python -m platformio run -e esp32dev -t upload
+```
+
+or add this to your user **PATH**, then open a new Command Prompt:
+
+```text
+C:\Users\Logan\.platformio\penv\Scripts
+```
+
+(Replace `Logan` if your Windows username differs.)
+
+Also install the [CP210x](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers) or [CH340](https://github.com/WCHSoftGroup/ch34xser_tools) USB serial driver if Windows doesn’t see the ESP32 COM port.
+
+---
+
 ## Quick start (ESP32 on your Wi‑Fi)
 
 ### 1. Put your Wi‑Fi credentials in
@@ -42,13 +81,19 @@ Replace with your real SSID and password. Leave `#define WIFI_SOFTAP` commented 
 
 ### 2. Flash the firmware
 
-```bash
+```bat
 pio run -e esp32dev -t upload
 pio device monitor
 ```
 
-Use `-e esp32-s3` or `-e esp32-c3` if that matches your board (`platformio.ini`).
+If `pio` isn’t on PATH:
 
+```bat
+python -m platformio run -e esp32dev -t upload
+python -m platformio device monitor
+```
+
+Use `-e esp32-s3` or `-e esp32-c3` if that matches your board (`platformio.ini`).
 ### 3. Read the ESP32’s IP from serial
 
 When it joins Wi‑Fi you should see something like:
