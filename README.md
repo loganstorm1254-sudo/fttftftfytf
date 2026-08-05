@@ -71,14 +71,15 @@ C:\Users\Logan\.platformio\penv\Scripts
 
 ### 1. Put your Wi‑Fi credentials in
 
-Edit `include/globals.h`:
+Create `include/wifi_secrets.h` (copy from `wifi_secrets.h.example`):
 
 ```c
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASS "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID "YourRealNetworkName"
+#define WIFI_PASS "YourRealPassword"
 ```
 
-Replace with your real SSID and password. Leave `#define WIFI_SOFTAP` commented out (station mode).
+Use your **2.4 GHz** SSID. This file is gitignored so updates won’t wipe it.
+Leave `#define WIFI_SOFTAP` commented out in `include/globals.h` (station mode).
 
 ### 2. Put the project somewhere with **no spaces** in the path
 
@@ -185,7 +186,7 @@ Then join `localhost:25565` with Minecraft 1.21.8.
 | `MAX_BLOCK_CHANGES` | `4096` | Raised builds need more RAM |
 | `GAMEMODE` | `0` | `0` survival, `1` creative |
 | `WIFI_SOFTAP` | off | Off = join your Wi‑Fi; on = ESP hotspot |
-| `WIFI_SSID` / `WIFI_PASS` | placeholders | **Set these before flashing** |
+| `WIFI_SSID` / `WIFI_PASS` | in `wifi_secrets.h` | **Create that file before flashing** |
 
 After edits: `pio run -e esp32-c3-supermini -t upload`.
 
