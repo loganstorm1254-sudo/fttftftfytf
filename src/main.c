@@ -756,24 +756,91 @@ static void wifi_event_handler (void *arg, esp_event_base_t event_base, int32_t 
   }
 #else
   if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-    printf("Wi‑Fi started, connecting to \"%s\"...\n", WIFI_SSID);
+    printf("Wi‑Fi driver up.\n");
     fflush(stdout);
-    esp_wifi_connect();
   } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
     wifi_event_sta_disconnected_t *disc = (wifi_event_sta_disconnected_t *)event_data;
-    printf("Wi‑Fi disconnected (reason %d). Retrying \"%s\"...\n", disc->reason, WIFI_SSID);
-    printf("  Check WIFI_SSID / WIFI_PASS in include/globals.h (2.4 GHz only).\n");
+    const char *hint = "unknown";
+    switch (disc->reason) {
+      case 2:   hint = "auth expired"; break;
+      case 15:  hint = "4-way handshake fail (wrong password?)"; break;
+      case 200: hint = "beacon timeout (weak signal)"; break;
+      case 201: hint = "AP not found (need 2.4 GHz SSID / closer to router)"; break;
+      case 202: hint = "auth fail"; break;
+      case 204: hint = "handshake timeout (wrong password / WPA3?)"; break;
+      case 205: hint = "connection fail"; break;
+      default:  break;
+    }
+    printf("Wi‑Fi disconnect reason %d — %s\n", disc->reason, hint);
+    printf("  Retrying \"%s\"...\n", WIFI_SSID);
     fflush(stdout);
+    vTaskDelay(pdMS_TO_TICKS(2000));
     esp_wifi_connect();
   } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
     printf("\n*** Got IP " IPSTR " ***\n", IP2STR(&event->ip_info.ip));
-    printf("Join Minecraft at " IPSTR ":%d\n\n", IP2STR(&event->ip_info.ip), PORT);
+    printf("Join Minecraft Java 1.21.8 at:  " IPSTR "\n\n", IP2STR(&event->ip_info.ip));
     fflush(stdout);
     start_minecraft_server();
   }
 #endif
 }
+
+#ifndef WIFI_SOFTAP
+static void wifi_scan_and_report (void) {
+  printf("Scanning for 2.4 GHz networks...\n");
+  fflush(stdout);
+
+  wifi_scan_config_t scan = {
+    .ssid = NULL,
+    .bssid = NULL,
+    .channel = 0,
+    .show_hidden = true,
+    .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+  };
+  if (esp_wifi_scan_start(&scan, true) != ESP_OK) {
+    printf("Scan failed.\n");
+    fflush(stdout);
+    return;
+  }
+
+  uint16_t ap_count = 0;
+  esp_wifi_scan_get_ap_num(&ap_count);
+  if (ap_count > 20) ap_count = 20;
+  wifi_ap_record_t aps[20];
+  uint16_t n = ap_count;
+  esp_wifi_scan_get_ap_records(&n, aps);
+
+  int found_target = 0;
+  printf("Found %u AP(s):\n", (unsigned)n);
+  for (uint16_t i = 0; i < n; i ++) {
+    const char *auth = "?";
+    switch (aps[i].authmode) {
+      case WIFI_AUTH_OPEN: auth = "OPEN"; break;
+      case WIFI_AUTH_WEP: auth = "WEP"; break;
+      case WIFI_AUTH_WPA_PSK: auth = "WPA"; break;
+      case WIFI_AUTH_WPA2_PSK: auth = "WPA2"; break;
+      case WIFI_AUTH_WPA_WPA2_PSK: auth = "WPA/WPA2"; break;
+      case WIFI_AUTH_WPA3_PSK: auth = "WPA3"; break;
+      case WIFI_AUTH_WPA2_WPA3_PSK: auth = "WPA2/WPA3"; break;
+      default: break;
+    }
+    int match = (strcmp((char *)aps[i].ssid, WIFI_SSID) == 0);
+    if (match) found_target = 1;
+    printf("  %s\"%s\"  ch=%d  rssi=%d  %s\n",
+           match ? ">>> " : "    ",
+           aps[i].ssid, aps[i].primary, aps[i].rssi, auth);
+  }
+  if (!found_target) {
+    printf("\n*** Your SSID \"%s\" was NOT seen.\n", WIFI_SSID);
+    printf("    ESP32-C3 is 2.4 GHz ONLY. Enable 2.4 GHz on the router,\n");
+    printf("    or use the 2.4 GHz SSID if 2.4/5 are split names.\n\n");
+  } else {
+    printf("SSID \"%s\" is visible — connecting...\n", WIFI_SSID);
+  }
+  fflush(stdout);
+}
+#endif
 
 void wifi_init () {
   // Line-buffer stdout so USB Serial/JTAG prints show up promptly
@@ -781,7 +848,11 @@ void wifi_init () {
   printf("\nesp32-mc boot — 1 player / 1 chunk\n");
   fflush(stdout);
 
-  nvs_flash_init();
+  esp_err_t nvs = nvs_flash_init();
+  if (nvs == ESP_ERR_NVS_NO_FREE_PAGES || nvs == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    nvs_flash_erase();
+    nvs_flash_init();
+  }
   esp_netif_init();
   esp_event_loop_create_default();
 
@@ -805,27 +876,36 @@ void wifi_init () {
   fflush(stdout);
   esp_wifi_set_mode(WIFI_MODE_AP);
   esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
+  esp_wifi_set_ps(WIFI_PS_NONE);
+  esp_wifi_start();
 #else
   esp_netif_create_default_wifi_sta();
   esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, NULL);
 
-  wifi_config_t wifi_config = {
-    .sta = {
-      .ssid = WIFI_SSID,
-      .password = WIFI_PASS,
-      // Accept WPA/WPA2; do not require WPA2-only
-      .threshold.authmode = WIFI_AUTH_WPA_WPA2_PSK
-    }
-  };
+  wifi_config_t wifi_config = {0};
+  strncpy((char *)wifi_config.sta.ssid, WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
+  strncpy((char *)wifi_config.sta.password, WIFI_PASS, sizeof(wifi_config.sta.password) - 1);
+  // Most permissive threshold so WPA/WPA2/WPA3-transition APs can associate
+  wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
+  wifi_config.sta.pmf_cfg.capable = true;
+  wifi_config.sta.pmf_cfg.required = false;
+  wifi_config.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
 
-  printf("Joining Wi‑Fi \"%s\"...\n", WIFI_SSID);
+  printf("Configured SSID=\"%s\" (password length %u)\n",
+         WIFI_SSID, (unsigned)strlen(WIFI_PASS));
   fflush(stdout);
+
   esp_wifi_set_mode(WIFI_MODE_STA);
   esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-#endif
-
+  // SuperMini PCB antenna: slightly lower TX can improve handshake stability
+  esp_wifi_set_max_tx_power(40); // unit is 0.25 dBm → 10 dBm
   esp_wifi_set_ps(WIFI_PS_NONE);
   esp_wifi_start();
+
+  // Diagnose before first connect
+  wifi_scan_and_report();
+  esp_wifi_connect();
+#endif
 }
 
 void app_main () {
