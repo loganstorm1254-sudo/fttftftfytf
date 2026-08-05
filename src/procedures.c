@@ -361,7 +361,10 @@ void spawnPlayer (PlayerData *player) {
   sc_updateTime(player->client_fd, world_time);
 
   #ifdef ENABLE_PLAYER_FLIGHT
-  if (GAMEMODE != 1 && GAMEMODE != 3) {
+  if (GAMEMODE == 1) {
+    // Creative: invulnerable | allow flight | creative mode
+    sc_playerAbilities(player->client_fd, 0x01 | 0x04 | 0x08);
+  } else if (GAMEMODE != 3) {
     // Give the player flight (for testing)
     sc_playerAbilities(player->client_fd, 0x04);
   }

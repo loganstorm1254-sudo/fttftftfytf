@@ -48,11 +48,11 @@
 #define MOB_DESPAWN_DISTANCE 256
 
 // Server game mode: 0 - survival; 1 - creative; 2 - adventure; 3 - spectator
-#define GAMEMODE 0
+#define GAMEMODE 1
 
-// 0 = only the chunk you are standing in (true 1-chunk view)
-// Raise to 1–2 if your board has spare RAM/CPU and you want neighbors
-#define VIEW_DISTANCE 0
+// Chunks around the player to send. 0 breaks many clients (void world).
+// 2 = 5×5 area — still tiny, works on ESP32-C3 SuperMini.
+#define VIEW_DISTANCE 2
 
 // Time between server ticks in microseconds (default = 1s)
 #define TIME_BETWEEN_TICKS 1000000
@@ -154,9 +154,9 @@
 // could cause bad performance or even crashes during gameplay.
 #define ALLOW_CHESTS
 
-// If defined, enables flight for all players. As a side-effect, allows
-// players to sprint when starving.
-// #define ENABLE_PLAYER_FLIGHT
+  // If defined, enables flight for all players. As a side-effect, allows
+  // players to sprint when starving.
+  #define ENABLE_PLAYER_FLIGHT
 
 // If defined, enables the item pickup animation when mining a block/
 // Does not affect how item pickups work! Items from broken blocks still
