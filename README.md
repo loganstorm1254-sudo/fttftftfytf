@@ -130,7 +130,7 @@ Server listening on port 25565...
 
 That IP is what you join. (Yours will differ.)
 
-### 4. Join from Minecraft (PC can be Ethernet)
+### 5. Join from Minecraft (PC can be Ethernet)
 
 1. Launch **Minecraft Java 1.21.8** (vanilla)
 2. Multiplayer → Add Server
