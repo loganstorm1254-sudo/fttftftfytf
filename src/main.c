@@ -787,7 +787,8 @@ static void wifi_event_handler (void *arg, esp_event_base_t event_base, int32_t 
 }
 
 #ifndef WIFI_SOFTAP
-static void wifi_scan_and_report (void) {
+// Fills out_best with the strongest AP matching WIFI_SSID. Returns 1 if found.
+static int wifi_scan_pick_best (wifi_ap_record_t *out_best) {
   printf("Scanning for 2.4 GHz networks...\n");
   fflush(stdout);
 
@@ -801,17 +802,17 @@ static void wifi_scan_and_report (void) {
   if (esp_wifi_scan_start(&scan, true) != ESP_OK) {
     printf("Scan failed.\n");
     fflush(stdout);
-    return;
+    return 0;
   }
 
   uint16_t ap_count = 0;
   esp_wifi_scan_get_ap_num(&ap_count);
-  if (ap_count > 20) ap_count = 20;
-  wifi_ap_record_t aps[20];
+  if (ap_count > 24) ap_count = 24;
+  wifi_ap_record_t aps[24];
   uint16_t n = ap_count;
   esp_wifi_scan_get_ap_records(&n, aps);
 
-  int found_target = 0;
+  int best_i = -1;
   printf("Found %u AP(s):\n", (unsigned)n);
   for (uint16_t i = 0; i < n; i ++) {
     const char *auth = "?";
@@ -826,19 +827,27 @@ static void wifi_scan_and_report (void) {
       default: break;
     }
     int match = (strcmp((char *)aps[i].ssid, WIFI_SSID) == 0);
-    if (match) found_target = 1;
+    if (match && (best_i < 0 || aps[i].rssi > aps[best_i].rssi)) best_i = (int)i;
     printf("  %s\"%s\"  ch=%d  rssi=%d  %s\n",
            match ? ">>> " : "    ",
            aps[i].ssid, aps[i].primary, aps[i].rssi, auth);
   }
-  if (!found_target) {
+
+  if (best_i < 0) {
     printf("\n*** Your SSID \"%s\" was NOT seen.\n", WIFI_SSID);
     printf("    ESP32-C3 is 2.4 GHz ONLY. Enable 2.4 GHz on the router,\n");
     printf("    or use the 2.4 GHz SSID if 2.4/5 are split names.\n\n");
-  } else {
-    printf("SSID \"%s\" is visible — connecting...\n", WIFI_SSID);
+    fflush(stdout);
+    return 0;
   }
+
+  *out_best = aps[best_i];
+  printf("Using strongest \"%s\"  ch=%d  rssi=%d  bssid=%02x:%02x:%02x:%02x:%02x:%02x\n",
+         out_best->ssid, out_best->primary, out_best->rssi,
+         out_best->bssid[0], out_best->bssid[1], out_best->bssid[2],
+         out_best->bssid[3], out_best->bssid[4], out_best->bssid[5]);
   fflush(stdout);
+  return 1;
 }
 #endif
 
@@ -882,31 +891,42 @@ void wifi_init () {
   esp_netif_create_default_wifi_sta();
   esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, NULL);
 
-  wifi_config_t wifi_config = {0};
-  strncpy((char *)wifi_config.sta.ssid, WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
-  strncpy((char *)wifi_config.sta.password, WIFI_PASS, sizeof(wifi_config.sta.password) - 1);
-  // Force WPA2-PSK — WPA3/SAE on SuperMini often yields reason 2 (auth expired)
-  wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-  wifi_config.sta.pmf_cfg.capable = true;
-  wifi_config.sta.pmf_cfg.required = false;
-  wifi_config.sta.sae_pwe_h2e = WPA3_SAE_PWE_UNSPECIFIED;
-
   printf("Configured SSID=\"%s\" (password length %u)\n",
          WIFI_SSID, (unsigned)strlen(WIFI_PASS));
-  if (strlen(WIFI_PASS) < 8) {
-    printf("WARNING: Wi‑Fi password looks too short — Windows CMD may have eaten '!' chars.\n");
+  if (strlen(WIFI_PASS) != 11) {
+    printf("NOTE: expected password length 11 for Rogue1254!! — got %u\n",
+           (unsigned)strlen(WIFI_PASS));
   }
   fflush(stdout);
 
   esp_wifi_set_mode(WIFI_MODE_STA);
-  esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
   // SuperMini PCB antenna: lower TX improves handshake on some APs
   esp_wifi_set_max_tx_power(34); // ~8.5 dBm
   esp_wifi_set_ps(WIFI_PS_NONE);
   esp_wifi_start();
 
-  // Diagnose before first connect
-  wifi_scan_and_report();
+  wifi_ap_record_t best = {0};
+  int have_best = wifi_scan_pick_best(&best);
+
+  wifi_config_t wifi_config = {0};
+  strncpy((char *)wifi_config.sta.ssid, WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
+  strncpy((char *)wifi_config.sta.password, WIFI_PASS, sizeof(wifi_config.sta.password) - 1);
+  // Home is WPA2/WPA3 — allow both; SAE must be enabled in sdkconfig
+  wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+  wifi_config.sta.pmf_cfg.capable = true;
+  wifi_config.sta.pmf_cfg.required = false;
+  wifi_config.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
+  wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+  wifi_config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+  if (have_best) {
+    memcpy(wifi_config.sta.bssid, best.bssid, 6);
+    wifi_config.sta.bssid_set = 1;
+    wifi_config.sta.channel = best.primary;
+  }
+
+  esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+  printf("Connecting...\n");
+  fflush(stdout);
   esp_wifi_connect();
 #endif
 }
