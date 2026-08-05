@@ -750,9 +750,15 @@ static void start_minecraft_server (void) {
 static void wifi_event_handler (void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
 #ifdef WIFI_SOFTAP
   if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
-    printf("SoftAP \"%s\" up. Connect Wi‑Fi, then join 192.168.4.1:%d\n", WIFI_SSID, PORT);
+    printf("\n*** SoftAP ready ***\n");
+    printf("  1. On your PC, join Wi‑Fi:  SSID=%s  PASS=%s\n", WIFI_SSID, WIFI_PASS);
+    printf("  2. Minecraft Java 1.21.8 → Multiplayer → 192.168.4.1\n\n");
     fflush(stdout);
     start_minecraft_server();
+  } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
+    wifi_event_ap_staconnected_t *e = (wifi_event_ap_staconnected_t *)event_data;
+    printf("Client joined SoftAP (AID=%d)\n", e->aid);
+    fflush(stdout);
   }
 #else
   if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
@@ -878,13 +884,15 @@ void wifi_init () {
   strncpy((char *)wifi_config.ap.password, WIFI_PASS, sizeof(wifi_config.ap.password));
   wifi_config.ap.ssid_len = strlen(WIFI_SSID);
   wifi_config.ap.max_connection = 4;
-  wifi_config.ap.authmode = (strlen(WIFI_PASS) >= 8) ? WIFI_AUTH_WPA2_PSK : WIFI_AUTH_OPEN;
-  wifi_config.ap.channel = 1;
+  wifi_config.ap.channel = 6;
+  wifi_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
+  wifi_config.ap.pmf_cfg.required = false;
 
-  printf("Starting SoftAP \"%s\"...\n", WIFI_SSID);
+  printf("Starting SoftAP SSID=\"%s\" PASS=\"%s\"...\n", WIFI_SSID, WIFI_PASS);
   fflush(stdout);
   esp_wifi_set_mode(WIFI_MODE_AP);
   esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
+  esp_wifi_set_max_tx_power(40);
   esp_wifi_set_ps(WIFI_PS_NONE);
   esp_wifi_start();
 #else
