@@ -1,0 +1,10 @@
+.vscode
+.pio
+.idea
+notchian
+bareiron
+bareiron.exe
+*.bin
+world.bin
+__pycache__/
+*.o
