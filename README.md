@@ -2,73 +2,30 @@
 
 Run a **local Minecraft Java 1.21.8** world on an ESP32 for **one player**, with **view distance = 1 chunk**.
 
-Built on [bareiron](https://github.com/p2r3/bareiron) (GPL-3.0) — a minimal Minecraft protocol server written for tiny devices.
+Built on [bareiron](https://github.com/p2r3/bareiron) (GPL-3.0).
 
 | Setting | Value |
 |---|---|
 | Target board | **ESP32-C3 SuperMini** (default) |
 | Minecraft | Java Edition **1.21.8** (vanilla client) |
-| Players | **1** (`MAX_PLAYERS`) |
-| View distance | **0** → only the chunk you stand in |
-| Default Wi‑Fi | **SoftAP hotspot** `ESP32-MC` / `minecraft` |
-| Join address | **`192.168.4.1:25565`** |
-
-No home-router join required. Your PC must connect to the ESP32’s Wi‑Fi (built-in or a cheap USB Wi‑Fi adapter).
+| Players | **1** |
+| View distance | **0** (only the chunk you stand in) |
+| Default Wi‑Fi | SoftAP hotspot **`ESP32-MC`** / **`minecraft`** |
+| Join address | **`192.168.4.1`** |
 
 ---
 
 ## What you need
 
-1. An **ESP32-C3 SuperMini** (or other ESP32 / S3 / C3)
-2. USB-C cable + [PlatformIO](https://platformio.org/) (VS Code extension or CLI)
-3. A PC with **Minecraft Java 1.21.8** (vanilla) that can join Wi‑Fi (built-in or USB adapter)
-
-No Arduino sketch — this uses **ESP-IDF** only.
+1. ESP32-C3 SuperMini + USB-C cable
+2. [PlatformIO](https://platformio.org/) (or `pip install platformio`)
+3. PC with Minecraft Java 1.21.8 **and Wi‑Fi** (built-in or USB Wi‑Fi adapter)
 
 ---
 
-## Install PlatformIO (Windows)
+## Flash + play (SoftAP)
 
-`pio` is not built into Windows. Pick **one** option:
-
-### Option A — VS Code (easiest)
-
-1. Install [VS Code](https://code.visualstudio.com/)
-2. Extensions → search **PlatformIO IDE** → Install
-3. File → Open Folder → this project folder
-4. Wait for PlatformIO to finish installing (bottom status bar)
-5. Use the PlatformIO toolbar: **Build** (✓) then **Upload** (→), or open a **PlatformIO** terminal and run the `pio` commands below
-
-### Option B — CLI in Command Prompt
-
-1. Install [Python 3](https://www.python.org/downloads/) — check **“Add python.exe to PATH”**
-2. Open a **new** Command Prompt and run:
-
-```bat
-pip install -U platformio
-```
-
-3. If `pio` still isn’t found, either:
-
-```bat
-python -m platformio run -e esp32-c3-supermini -t upload
-```
-
-or add this to your user **PATH**, then open a new Command Prompt:
-
-```text
-C:\Users\Logan\.platformio\penv\Scripts
-```
-
-(Replace `Logan` if your Windows username differs.)
-
-**ESP32-C3 SuperMini** uses native USB — usually no CP210x/CH340 driver. Windows should show a COM port like `USB Serial Device` / `USB JTAG`.
-
----
-
-## Quick start (SoftAP — no router changes)
-
-### 1. Flash
+Project path must have **no spaces** (use `C:\esp32mc`).
 
 ```bat
 cd C:\esp32mc
@@ -76,172 +33,23 @@ python -m platformio run -e esp32-c3-supermini -t upload
 python -m platformio device monitor
 ```
 
-Press **RESET**. You should see SoftAP ready.
+Press **RESET**. Serial should say SoftAP ready.
 
-### 2. On the PC, join the ESP32 Wi‑Fi
+Then on the PC:
 
-| | |
-|---|---|
-| SSID | `ESP32-MC` |
-| Password | `minecraft` |
+1. Join Wi‑Fi **`ESP32-MC`** / password **`minecraft`**
+2. Minecraft → Multiplayer → **`192.168.4.1`**
 
-(Ethernet-only PCs need a USB Wi‑Fi adapter for this step.)
-
-### 3. Join Minecraft
-
-Minecraft Java **1.21.8** → Multiplayer → **`192.168.4.1`**
+If upload fails: hold **BOOT**, tap **RESET**, release **BOOT**, upload again.
 
 ---
 
-## Optional: join your home Wi‑Fi instead
+## Optional: join home Wi‑Fi instead
 
-Comment out `#define WIFI_SOFTAP` in `include/globals.h`, create `include/wifi_secrets.h` with your 2.4 GHz SSID/password, and prefer **WPA2-only** on the router (WPA2/WPA3 mixed often fails on C3 SuperMini).
-
-### Put the project somewhere with **no spaces** in the path
-
-ESP-IDF fails if the folder path has spaces. Your Downloads copy often looks like:
-
-```text
-C:\Users\Logan\Downloads\fttftftfytf-cursor-esp32-one-chunk-mc-c0be (1)\...
-                                                         ^^^ space — breaks the build
-```
-
-Move/rename it first, for example in Command Prompt:
-
-```bat
-mkdir C:\esp32mc
-xcopy /E /I "C:\Users\Logan\Downloads\fttftftfytf-cursor-esp32-one-chunk-mc-c0be (1)\fttftftfytf-cursor-esp32-one-chunk-mc-c0be" C:\esp32mc
-cd C:\esp32mc
-```
-
-(Adjust the source folder name if yours differs.)
-
-### 3. Flash the firmware
-
-Plug in the SuperMini over USB-C, then:
-
-```bat
-python -m platformio run -e esp32-c3-supermini -t upload
-python -m platformio device monitor
-```
-
-Or if `pio` is on PATH:
-
-```bat
-pio run -e esp32-c3-supermini -t upload
-pio device monitor
-```
-
-**If upload fails / no COM port:** hold **BOOT**, tap **RESET**, release **BOOT**, then run upload again.
-
-**If you already built once and then changed flash settings**, clean first:
-
-```bat
-python -m platformio run -e esp32-c3-supermini -t fullclean
-python -m platformio run -e esp32-c3-supermini -t upload
-```
-
-Other boards: `-e esp32dev` or `-e esp32-s3`.
-
-### 4. Read the ESP32’s IP from serial
-
-When it joins Wi‑Fi you should see something like:
-
-```text
-Got IP 192.168.1.42, starting server on port 25565...
-Server listening on port 25565...
-```
-
-That IP is what you join. (Yours will differ.)
-
-### 5. Join from Minecraft (PC can be Ethernet)
-
-1. Launch **Minecraft Java 1.21.8** (vanilla)
-2. Multiplayer → Add Server
-3. Address: **`<ESP32-IP>`** (e.g. `192.168.1.42`)
-4. Join — one chunk of world around you
-
-PC and ESP32 just need to be on the **same LAN** (same router). Ethernet on the PC is fine.
-
----
-
-## Optional: SoftAP hotspot instead
-
-If you want the ESP32 to broadcast its own Wi‑Fi (and your PC can join it):
-
-```c
-#define WIFI_SOFTAP
-#define WIFI_SSID "ESP32-MC"
-#define WIFI_PASS "minecraft"
-```
-
-Then join Minecraft at `192.168.4.1:25565`. This needs a Wi‑Fi client on the PC — skip SoftAP if you only have Ethernet.
-
----
-
-## Try on your PC first (no ESP required)
-
-Registries are already generated in this repo. On Linux:
-
-```bash
-./build.sh          # builds and runs on 0.0.0.0:25565
-# or:
-gcc src/*.c -O2 -Iinclude -o bareiron && ./bareiron
-```
-
-Then join `localhost:25565` with Minecraft 1.21.8.
-
----
-
-## Tuning (`include/globals.h`)
-
-| Macro | Default here | Notes |
-|---|---|---|
-| `MAX_PLAYERS` | `1` | Keep at 1 on ESP32 |
-| `VIEW_DISTANCE` | `0` | `0` = current chunk only; `1` ≈ 3×3 |
-| `MAX_BLOCK_CHANGES` | `4096` | Raised builds need more RAM |
-| `GAMEMODE` | `0` | `0` survival, `1` creative |
-| `WIFI_SOFTAP` | off | Off = join your Wi‑Fi; on = ESP hotspot |
-| `WIFI_SSID` / `WIFI_PASS` | in `wifi_secrets.h` | **Create that file before flashing** |
-
-After edits: `pio run -e esp32-c3-supermini -t upload`.
-
-Check current config anytime:
-
-```bash
-./scripts/show-config.sh
-```
-
----
-
-## Limits (honest)
-
-This is **not** a full vanilla server. Expect:
-
-- Simplified terrain / crafting / items
-- No redstone complexity, limited mobs
-- Walking far loads the *next* single chunk (still one at a time)
-- Vanilla client only — avoid Fabric/Forge for the client
-- ESP32-C3 SuperMini is tight on RAM — keep `VIEW_DISTANCE 0` / `MAX_PLAYERS 1`
-- C3 is **2.4 GHz Wi‑Fi only**
-
-Full upstream docs: https://github.com/p2r3/bareiron
-
----
-
-## Regenerating registries (only if you change MC version)
-
-Already done for 1.21.8. If you need to redo:
-
-```bash
-# needs Java 21+ and Node
-mkdir -p notchian
-# put official 1.21.8 server.jar into notchian/
-./extract_registries.sh
-```
+Comment out `#define WIFI_SOFTAP` in `include/globals.h`, add `include/wifi_secrets.h` with your 2.4 GHz SSID/password. Many SuperMinis fail on **WPA2/WPA3** mixed routers; SoftAP avoids that.
 
 ---
 
 ## License
 
-Server code is based on **bareiron**, licensed under **GNU GPL v3** — see `LICENSE`.
+Based on **bareiron**, **GNU GPL v3** — see `LICENSE`.
