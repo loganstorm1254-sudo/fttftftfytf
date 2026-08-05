@@ -80,29 +80,46 @@ Edit `include/globals.h`:
 
 Replace with your real SSID and password. Leave `#define WIFI_SOFTAP` commented out (station mode).
 
-### 2. Flash the firmware
+### 2. Put the project somewhere with **no spaces** in the path
 
-Plug in the SuperMini over USB-C, then:
+ESP-IDF fails if the folder path has spaces. Your Downloads copy often looks like:
 
-```bat
-pio run -e esp32-c3-supermini -t upload
-pio device monitor
+```text
+C:\Users\Logan\Downloads\fttftftfytf-cursor-esp32-one-chunk-mc-c0be (1)\...
+                                                         ^^^ space — breaks the build
 ```
 
-If `pio` isn’t on PATH:
+Move/rename it first, for example in Command Prompt:
+
+```bat
+mkdir C:\esp32mc
+xcopy /E /I "C:\Users\Logan\Downloads\fttftftfytf-cursor-esp32-one-chunk-mc-c0be (1)\fttftftfytf-cursor-esp32-one-chunk-mc-c0be" C:\esp32mc
+cd C:\esp32mc
+```
+
+(Adjust the source folder name if yours differs.)
+
+### 3. Flash the firmware
+
+Plug in the SuperMini over USB-C, then:
 
 ```bat
 python -m platformio run -e esp32-c3-supermini -t upload
 python -m platformio device monitor
 ```
 
-(`esp32-c3-supermini` is also the project default, so plain `pio run -t upload` works.)
+Or if `pio` is on PATH:
+
+```bat
+pio run -e esp32-c3-supermini -t upload
+pio device monitor
+```
 
 **If upload fails / no COM port:** hold **BOOT**, tap **RESET**, release **BOOT**, then run upload again.
 
 Other boards: `-e esp32dev` or `-e esp32-s3`.
 
-### 3. Read the ESP32’s IP from serial
+### 4. Read the ESP32’s IP from serial
 
 When it joins Wi‑Fi you should see something like:
 
