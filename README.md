@@ -10,19 +10,18 @@ Built on [bareiron](https://github.com/p2r3/bareiron) (GPL-3.0) — a minimal Mi
 | Minecraft | Java Edition **1.21.8** (vanilla client) |
 | Players | **1** (`MAX_PLAYERS`) |
 | View distance | **0** → only the chunk you stand in |
-| Default Wi‑Fi | **Station mode** — ESP32 joins your home Wi‑Fi |
-| Join address | ESP32’s LAN IP (printed on serial), port **25565** |
+| Default Wi‑Fi | **SoftAP hotspot** `ESP32-MC` / `minecraft` |
+| Join address | **`192.168.4.1:25565`** |
 
-Works when your PC is on **Ethernet**: ESP32 joins the same router over Wi‑Fi; you connect Minecraft to the ESP32’s IP on the LAN.
+No home-router join required. Your PC must connect to the ESP32’s Wi‑Fi (built-in or a cheap USB Wi‑Fi adapter).
 
 ---
 
 ## What you need
 
 1. An **ESP32-C3 SuperMini** (or other ESP32 / S3 / C3)
-2. A **Wi‑Fi router** the ESP32 can join (**2.4 GHz** — C3 has no 5 GHz)
-3. USB-C cable + [PlatformIO](https://platformio.org/) (VS Code extension or CLI)
-4. A PC (Ethernet or Wi‑Fi) with **Minecraft Java 1.21.8** (vanilla)
+2. USB-C cable + [PlatformIO](https://platformio.org/) (VS Code extension or CLI)
+3. A PC with **Minecraft Java 1.21.8** (vanilla) that can join Wi‑Fi (built-in or USB adapter)
 
 No Arduino sketch — this uses **ESP-IDF** only.
 
@@ -67,21 +66,38 @@ C:\Users\Logan\.platformio\penv\Scripts
 
 ---
 
-## Quick start (ESP32-C3 SuperMini on your Wi‑Fi)
+## Quick start (SoftAP — no router changes)
 
-### 1. Put your Wi‑Fi credentials in
+### 1. Flash
 
-Create `include/wifi_secrets.h` (copy from `wifi_secrets.h.example`):
-
-```c
-#define WIFI_SSID "YourRealNetworkName"
-#define WIFI_PASS "YourRealPassword"
+```bat
+cd C:\esp32mc
+python -m platformio run -e esp32-c3-supermini -t upload
+python -m platformio device monitor
 ```
 
-Use your **2.4 GHz** SSID. This file is gitignored so updates won’t wipe it.
-Leave `#define WIFI_SOFTAP` commented out in `include/globals.h` (station mode).
+Press **RESET**. You should see SoftAP ready.
 
-### 2. Put the project somewhere with **no spaces** in the path
+### 2. On the PC, join the ESP32 Wi‑Fi
+
+| | |
+|---|---|
+| SSID | `ESP32-MC` |
+| Password | `minecraft` |
+
+(Ethernet-only PCs need a USB Wi‑Fi adapter for this step.)
+
+### 3. Join Minecraft
+
+Minecraft Java **1.21.8** → Multiplayer → **`192.168.4.1`**
+
+---
+
+## Optional: join your home Wi‑Fi instead
+
+Comment out `#define WIFI_SOFTAP` in `include/globals.h`, create `include/wifi_secrets.h` with your 2.4 GHz SSID/password, and prefer **WPA2-only** on the router (WPA2/WPA3 mixed often fails on C3 SuperMini).
+
+### Put the project somewhere with **no spaces** in the path
 
 ESP-IDF fails if the folder path has spaces. Your Downloads copy often looks like:
 
