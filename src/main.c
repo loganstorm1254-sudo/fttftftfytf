@@ -885,20 +885,23 @@ void wifi_init () {
   wifi_config_t wifi_config = {0};
   strncpy((char *)wifi_config.sta.ssid, WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
   strncpy((char *)wifi_config.sta.password, WIFI_PASS, sizeof(wifi_config.sta.password) - 1);
-  // Most permissive threshold so WPA/WPA2/WPA3-transition APs can associate
-  wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
+  // Force WPA2-PSK — WPA3/SAE on SuperMini often yields reason 2 (auth expired)
+  wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
   wifi_config.sta.pmf_cfg.capable = true;
   wifi_config.sta.pmf_cfg.required = false;
-  wifi_config.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
+  wifi_config.sta.sae_pwe_h2e = WPA3_SAE_PWE_UNSPECIFIED;
 
   printf("Configured SSID=\"%s\" (password length %u)\n",
          WIFI_SSID, (unsigned)strlen(WIFI_PASS));
+  if (strlen(WIFI_PASS) < 8) {
+    printf("WARNING: Wi‑Fi password looks too short — Windows CMD may have eaten '!' chars.\n");
+  }
   fflush(stdout);
 
   esp_wifi_set_mode(WIFI_MODE_STA);
   esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-  // SuperMini PCB antenna: slightly lower TX can improve handshake stability
-  esp_wifi_set_max_tx_power(40); // unit is 0.25 dBm → 10 dBm
+  // SuperMini PCB antenna: lower TX improves handshake on some APs
+  esp_wifi_set_max_tx_power(34); // ~8.5 dBm
   esp_wifi_set_ps(WIFI_PS_NONE);
   esp_wifi_start();
 
