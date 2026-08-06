@@ -2,23 +2,25 @@
 
 Fabric mod for **Minecraft 1.21.11**.
 
-Adds an **OP-only** throwable — **Chunk Boomerits**. Throw it to instantly delete a chunk.
+OP-only throwable that deletes a chunk on hit.
 
-## Get the item (operators only)
+## Get the item
 
+**Creative:** Operator Utilities tab (cheats/OP required to see that tab)
+
+**Commands:**
 ```
+/give @s chunkboomerits:chunk_boomerits
+/give @s chunkboomerits:chunk_boomerits 16
 /chunkboomerits
-/chunkboomerits 16
-/chunkboomerits Steve
-/chunkboomerits @a 4
+/boomerits
 ```
-
-Requires permission level **2+** (same as `/give`). Not in the creative inventory.
 
 ## Install
 
-1. Fabric Loader for 1.21.11 + Fabric API
+1. Fabric Loader + Fabric API for 1.21.11
 2. Drop `dist/chunk-boomerits-1.0.0.jar` into `mods`
+3. Restart
 
 ## Build
 

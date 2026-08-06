@@ -7,7 +7,10 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
+
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 
 import com.chunkboomerits.ChunkBoomeritsMod;
 
@@ -28,6 +31,8 @@ public final class ModItems {
 	}
 
 	public static void initialize() {
-		// Not in creative tabs — OP-only via /chunkboomerits
+		// Operator Utilities tab (visible when you have OP / cheats)
+		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.OP_BLOCKS)
+				.register(entries -> entries.accept(CHUNK_BOOMERITS));
 	}
 }
