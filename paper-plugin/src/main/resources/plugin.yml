@@ -63,6 +63,14 @@ commands:
   baltop:
     description: Top balances
     usage: /baltop [amount]
+  ah:
+    description: Auction house
+    usage: /ah | /ah sell <price>
+    aliases: [auction, auctions]
+  shop:
+    description: Server shop
+    usage: /shop
+    aliases: [store]
 
 permissions:
   chunkboomerits.give:
@@ -95,6 +103,12 @@ permissions:
   chunkboomerits.economy.eco:
     description: Admin economy commands
     default: op
+  chunkboomerits.auction:
+    description: Use the auction house
+    default: true
+  chunkboomerits.shop:
+    description: Use the server shop
+    default: true
   chunkboomerits.*:
     description: All Chunk Boomerits tools
     default: op
@@ -109,3 +123,5 @@ permissions:
       chunkboomerits.economy.bal: true
       chunkboomerits.economy.pay: true
       chunkboomerits.economy.eco: true
+      chunkboomerits.auction: true
+      chunkboomerits.shop: true

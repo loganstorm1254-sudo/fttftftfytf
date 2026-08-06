@@ -122,9 +122,9 @@ public final class OpItems {
 				.decoration(TextDecoration.ITALIC, false));
 		meta.lore(List.of(
 				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
-				Component.text("Right-click: open scoreboard editor", NamedTextColor.GRAY)
+				Component.text("Right-click: admin hub", NamedTextColor.GRAY)
 						.decoration(TextDecoration.ITALIC, false),
-				Component.text("Edit $ sidebar colors & animation", NamedTextColor.DARK_GRAY)
+				Component.text("Scoreboard editor + /shop setup", NamedTextColor.DARK_GRAY)
 						.decoration(TextDecoration.ITALIC, false)
 		));
 		meta.getPersistentDataContainer().set(SCOREBOARD_SHOVEL_KEY, PersistentDataType.BYTE, (byte) 1);

@@ -1,22 +1,31 @@
-# Chunk Boomerits + OP Tools + Music Discs
+# Chunk Boomerits + Economy + AH + Shop
 
 **Paper / Purpur 1.21.11 plugin**
 
 ## Install
-1. Download plugin: `dist/ChunkBoomerits-1.4.1.jar`
-2. Put it in **`plugins/`** (remove older ChunkBoomerits jars)
-3. **Fully restart** the server (not `/reload`)
-4. Accept the resource pack on join (for music discs)
+1. Download: `dist/ChunkBoomerits-1.6.0.jar`
+2. Put in `plugins/` (remove older jars)
+3. Fully restart
 
-## Commands (always visible; OP-checked in-game)
+## Economy
 ```
-/killhammer              # mace — insta-kill
-/invhelmet               # copper helmet — invincible
-/cbgive killhammer
-/cbgive invhelmet
-/kicksword
-/chunkboomerits
-/despacito /moskau /kimjonggoon
+/bal  /pay <player> <amount>  /eco ...  /baltop
 ```
 
-If a command still missing: check console for `Registered /killhammer` on startup.
+## Auction house
+```
+/ah                  # browse / buy
+/ah sell <price>     # list item in hand
+```
+Click your own listing to cancel and get the item back.
+
+## Server shop
+```
+/shop                # buy admin-set items (totems, etc.)
+```
+Admins: `/sbshovel` → **Shop Admin** → hold a totem → **Add held item** → type price.
+
+## OP shovel
+```
+/sbshovel            # Scoreboard editor + Shop admin hub
+```

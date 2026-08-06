@@ -3,17 +3,28 @@ package com.chunkboomerits.paper;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.chunkboomerits.paper.economy.AdminHubGui;
+import com.chunkboomerits.paper.economy.AuctionCommands;
+import com.chunkboomerits.paper.economy.AuctionGui;
+import com.chunkboomerits.paper.economy.AuctionService;
 import com.chunkboomerits.paper.economy.EconomyCommands;
 import com.chunkboomerits.paper.economy.EconomyListener;
 import com.chunkboomerits.paper.economy.EconomyScoreboard;
 import com.chunkboomerits.paper.economy.EconomyService;
 import com.chunkboomerits.paper.economy.ScoreboardEditorGui;
 import com.chunkboomerits.paper.economy.ScoreboardShovelListener;
+import com.chunkboomerits.paper.economy.ShopAdminGui;
+import com.chunkboomerits.paper.economy.ShopCommands;
+import com.chunkboomerits.paper.economy.ShopGui;
+import com.chunkboomerits.paper.economy.ShopService;
 
 public final class ChunkBoomeritsPlugin extends JavaPlugin {
 	private static ChunkBoomeritsPlugin instance;
 	private EconomyService economy;
 	private EconomyScoreboard economyScoreboard;
+	private AuctionService auctions;
+	private ShopService shop;
+	private ShopGui shopGui;
 
 	@Override
 	public void onEnable() {
@@ -44,6 +55,11 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		economyScoreboard = new EconomyScoreboard(this, economy);
 		economyScoreboard.load();
 
+		auctions = new AuctionService(this);
+		auctions.load();
+		shop = new ShopService(this);
+		shop.load();
+
 		EconomyCommands ecoCmds = new EconomyCommands(economy, economyScoreboard);
 		bindEco("bal", ecoCmds);
 		bindEco("balance", ecoCmds);
@@ -51,9 +67,30 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		bindEco("eco", ecoCmds);
 		bindEco("baltop", ecoCmds);
 
+		AuctionGui auctionGui = new AuctionGui(auctions, economy, economyScoreboard);
+		AuctionCommands auctionCmds = new AuctionCommands(auctions, auctionGui, economy);
+		PluginCommand ah = getCommand("ah");
+		if (ah != null) {
+			ah.setExecutor(auctionCmds);
+			ah.setTabCompleter(auctionCmds);
+		}
+
+		shopGui = new ShopGui(shop, economy, economyScoreboard);
+		PluginCommand shopCmd = getCommand("shop");
+		if (shopCmd != null) {
+			shopCmd.setExecutor(new ShopCommands(shopGui));
+		}
+
 		ScoreboardEditorGui editorGui = new ScoreboardEditorGui(economyScoreboard);
+		ShopAdminGui shopAdminGui = new ShopAdminGui(shop, economy);
+		AdminHubGui hub = new AdminHubGui(editorGui, shopAdminGui);
+
 		getServer().getPluginManager().registerEvents(editorGui, this);
-		getServer().getPluginManager().registerEvents(new ScoreboardShovelListener(editorGui), this);
+		getServer().getPluginManager().registerEvents(shopAdminGui, this);
+		getServer().getPluginManager().registerEvents(hub, this);
+		getServer().getPluginManager().registerEvents(auctionGui, this);
+		getServer().getPluginManager().registerEvents(shopGui, this);
+		getServer().getPluginManager().registerEvents(new ScoreboardShovelListener(hub), this);
 		getServer().getPluginManager().registerEvents(new EconomyListener(economy, economyScoreboard), this);
 
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
@@ -65,13 +102,19 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Economy ready: /bal /pay /eco /baltop — OP shovel: /sbshovel");
+		getLogger().info("Economy: /bal /pay /ah /shop — OP shovel: /sbshovel (scoreboard + shop admin)");
 	}
 
 	@Override
 	public void onDisable() {
 		if (economy != null) {
 			economy.save();
+		}
+		if (auctions != null) {
+			auctions.save();
+		}
+		if (shop != null) {
+			shop.save();
 		}
 		if (economyScoreboard != null) {
 			economyScoreboard.shutdown();
@@ -106,6 +149,10 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 
 	public EconomyScoreboard economyScoreboard() {
 		return economyScoreboard;
+	}
+
+	public ShopGui shopGui() {
+		return shopGui;
 	}
 
 	public static ChunkBoomeritsPlugin get() {

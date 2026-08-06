@@ -15,13 +15,13 @@ import org.bukkit.inventory.ItemStack;
 import com.chunkboomerits.paper.OpItems;
 
 /**
- * OP shovel opens the scoreboard editor GUI.
+ * OP shovel opens the admin hub (scoreboard + shop).
  */
 public final class ScoreboardShovelListener implements Listener {
-	private final ScoreboardEditorGui gui;
+	private final AdminHubGui hub;
 
-	public ScoreboardShovelListener(ScoreboardEditorGui gui) {
-		this.gui = gui;
+	public ScoreboardShovelListener(AdminHubGui hub) {
+		this.hub = hub;
 	}
 
 	@EventHandler(priority = EventPriority.HIGH)
@@ -42,10 +42,10 @@ public final class ScoreboardShovelListener implements Listener {
 		event.setCancelled(true);
 
 		if (!player.isOp() && !player.hasPermission("chunkboomerits.scoreboard") && !player.hasPermission("chunkboomerits.*")) {
-			player.sendMessage(Component.text("Scoreboard Shovel is OP-only.", NamedTextColor.RED));
+			player.sendMessage(Component.text("Admin shovel is OP-only.", NamedTextColor.RED));
 			return;
 		}
 
-		gui.open(player);
+		hub.open(player);
 	}
 }
