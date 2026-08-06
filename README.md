@@ -3,7 +3,7 @@
 **Paper / Purpur 1.21.11 plugin**
 
 ## Install
-1. Download plugin: `dist/ChunkBoomerits-1.3.0.jar`
+1. Download plugin: `dist/ChunkBoomerits-1.3.1.jar`
 2. Put it in **`plugins/`**
 3. Restart — players are prompted for the resource pack (custom disc audio)
 
