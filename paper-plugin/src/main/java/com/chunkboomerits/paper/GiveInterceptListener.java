@@ -111,7 +111,7 @@ public final class GiveInterceptListener implements Listener {
 			boolean showAmount,
 			Supplier<ItemStack> factory
 	) {
-		if (!sender.hasPermission(permission) && !sender.isOp()) {
+		if (!sender.hasPermission(permission) && !sender.isOp() && !sender.hasPermission("chunkboomerits.*")) {
 			sender.sendMessage(Component.text("You don't have permission to give " + label + ".", NamedTextColor.RED));
 			return true;
 		}

@@ -3,7 +3,9 @@ package com.chunkboomerits.paper;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import net.kyori.adventure.text.Component;
@@ -16,6 +18,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 
 /**
  * Shared give logic for OP tools.
@@ -65,9 +68,44 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 		return disc(CustomDisc.KIM_JONG_GOON);
 	}
 
+	/** Unified give: /cbgive <item> [player] */
+	public static CommandExecutor cbgive() {
+		return new CbGiveCommand();
+	}
+
+	public static TabCompleter cbgiveTab() {
+		return new CbGiveCommand();
+	}
+
+	private static boolean mayUse(CommandSender sender, String permission) {
+		return sender.isOp() || sender.hasPermission(permission) || sender.hasPermission("chunkboomerits.*");
+	}
+
+	static void giveStack(CommandSender sender, Player target, ItemStack stack, String itemLabel) {
+		PlayerInventory inv = target.getInventory();
+		ItemStack hand = inv.getItemInMainHand();
+		if (hand.getType().isAir()) {
+			inv.setItemInMainHand(stack);
+		} else {
+			Map<Integer, ItemStack> leftover = inv.addItem(stack);
+			leftover.values().forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));
+		}
+		target.updateInventory();
+
+		sender.sendMessage(Component.text(
+				"Gave 1 " + itemLabel + " (" + stack.getType().name() + ") to " + target.getName(),
+				NamedTextColor.GREEN
+		));
+		if (!sender.equals(target)) {
+			target.sendMessage(Component.text("You received " + itemLabel + ".", NamedTextColor.GOLD));
+		} else {
+			sender.sendMessage(Component.text("Check your hotbar — item is in your hand or inventory.", NamedTextColor.YELLOW));
+		}
+	}
+
 	@Override
 	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-		if (!sender.hasPermission(permission)) {
+		if (!mayUse(sender, permission)) {
 			sender.sendMessage(Component.text("You must be OP to use this.", NamedTextColor.RED));
 			return true;
 		}
@@ -119,23 +157,40 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 			amount = Math.max(1, Math.min(64, amount));
 		}
 
-		ItemStack stack = factory.apply(amount);
-		target.getInventory().addItem(stack).values()
-				.forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));
+		ItemStack stack;
+		try {
+			stack = factory.apply(amount);
+		} catch (Throwable ex) {
+			sender.sendMessage(Component.text("Failed to create " + itemLabel + ": " + ex.getMessage(), NamedTextColor.RED));
+			ChunkBoomeritsPlugin.get().getLogger().severe("Failed to create " + itemLabel);
+			ex.printStackTrace();
+			return true;
+		}
+		if (stack == null || stack.getType().isAir()) {
+			sender.sendMessage(Component.text("Failed to create " + itemLabel + " (empty item). Is your server 1.21.11?", NamedTextColor.RED));
+			return true;
+		}
 
-		sender.sendMessage(Component.text(
-				"Gave " + amount + " " + itemLabel + " to " + target.getName(),
-				NamedTextColor.GREEN
-		));
-		if (!sender.equals(target)) {
-			target.sendMessage(Component.text("You received " + amount + " " + itemLabel + ".", NamedTextColor.GOLD));
+		if (stackable) {
+			Map<Integer, ItemStack> leftover = target.getInventory().addItem(stack);
+			leftover.values().forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));
+			target.updateInventory();
+			sender.sendMessage(Component.text(
+					"Gave " + amount + " " + itemLabel + " to " + target.getName(),
+					NamedTextColor.GREEN
+			));
+			if (!sender.equals(target)) {
+				target.sendMessage(Component.text("You received " + amount + " " + itemLabel + ".", NamedTextColor.GOLD));
+			}
+		} else {
+			giveStack(sender, target, stack, itemLabel);
 		}
 		return true;
 	}
 
 	@Override
 	public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-		if (!sender.hasPermission(permission)) {
+		if (!mayUse(sender, permission)) {
 			return List.of();
 		}
 		if (args.length == 1) {
@@ -160,5 +215,88 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 					.toList();
 		}
 		return List.of();
+	}
+
+	private static final class CbGiveCommand implements CommandExecutor, TabCompleter {
+		private static final List<String> ITEMS = List.of(
+				"boomerits", "kicksword", "killhammer", "invhelmet",
+				"despacito", "moskau", "kimjonggoon"
+		);
+
+		@Override
+		public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+			if (args.length < 1) {
+				sender.sendMessage(Component.text("Usage: /cbgive <" + String.join("|", ITEMS) + "> [player]", NamedTextColor.YELLOW));
+				return true;
+			}
+
+			String id = args[0].toLowerCase(Locale.ROOT);
+			GiveSpec spec = resolve(id);
+			if (spec == null) {
+				sender.sendMessage(Component.text("Unknown item. Try: " + String.join(", ", ITEMS), NamedTextColor.RED));
+				return true;
+			}
+			if (!mayUse(sender, spec.permission)) {
+				sender.sendMessage(Component.text("You must be OP to use this.", NamedTextColor.RED));
+				return true;
+			}
+
+			Player target;
+			if (args.length >= 2) {
+				target = Bukkit.getPlayerExact(args[1]);
+				if (target == null) {
+					sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+					return true;
+				}
+			} else if (sender instanceof Player player) {
+				target = player;
+			} else {
+				sender.sendMessage(Component.text("Usage: /cbgive <item> <player>", NamedTextColor.RED));
+				return true;
+			}
+
+			ItemStack stack;
+			try {
+				stack = spec.factory.get();
+			} catch (Throwable ex) {
+				sender.sendMessage(Component.text("Failed to create item: " + ex.getMessage(), NamedTextColor.RED));
+				ex.printStackTrace();
+				return true;
+			}
+			giveStack(sender, target, stack, spec.label);
+			return true;
+		}
+
+		@Override
+		public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+			if (args.length == 1) {
+				String prefix = args[0].toLowerCase(Locale.ROOT);
+				return ITEMS.stream().filter(i -> i.startsWith(prefix)).toList();
+			}
+			if (args.length == 2) {
+				String prefix = args[1].toLowerCase(Locale.ROOT);
+				return Bukkit.getOnlinePlayers().stream()
+						.map(Player::getName)
+						.filter(n -> n.toLowerCase(Locale.ROOT).startsWith(prefix))
+						.toList();
+			}
+			return List.of();
+		}
+
+		private static GiveSpec resolve(String id) {
+			return switch (id) {
+				case "boomerits", "chunkboomerits" -> new GiveSpec("chunkboomerits.give", "Chunk Boomerits", () -> OpItems.createBoomerits(1));
+				case "kicksword", "kick_sword" -> new GiveSpec("chunkboomerits.kicksword", "Kick Sword", OpItems::createKickSword);
+				case "killhammer", "hammer", "instakillhammer" -> new GiveSpec("chunkboomerits.killhammer", "Insta Kill Hammer", OpItems::createKillHammer);
+				case "invhelmet", "invinciblehelmet", "copperhelmet" -> new GiveSpec("chunkboomerits.invhelmet", "Invincible Copper Helmet", OpItems::createInvincibleHelmet);
+				case "despacito" -> new GiveSpec("chunkboomerits.disc", CustomDisc.DESPACITO.itemLabel(), CustomDisc.DESPACITO::create);
+				case "moskau" -> new GiveSpec("chunkboomerits.disc", CustomDisc.MOSKAU.itemLabel(), CustomDisc.MOSKAU::create);
+				case "kimjonggoon", "kimjong" -> new GiveSpec("chunkboomerits.disc", CustomDisc.KIM_JONG_GOON.itemLabel(), CustomDisc.KIM_JONG_GOON::create);
+				default -> null;
+			};
+		}
+
+		private record GiveSpec(String permission, String label, Supplier<ItemStack> factory) {
+		}
 	}
 }

@@ -6,11 +6,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
+import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -70,13 +72,16 @@ public final class OpItems {
 	}
 
 	public static ItemStack createKillHammer() {
-		ItemStack stack = new ItemStack(Material.MACE);
-		ItemMeta meta = stack.getItemMeta();
+		Material mat = firstAvailable(Material.MACE, Material.NETHERITE_AXE, Material.IRON_AXE);
+		ItemStack stack = new ItemStack(mat);
+		ItemMeta meta = requireMeta(stack, "Insta Kill Hammer");
 		meta.displayName(Component.text("Insta Kill Hammer", NamedTextColor.RED)
 				.decoration(TextDecoration.ITALIC, false));
 		meta.lore(List.of(
 				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
 				Component.text("Hit anything to kill it instantly", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false),
+				Component.text(mat == Material.MACE ? "Mace texture" : "Axe stand-in (mace missing on this server)", NamedTextColor.DARK_GRAY)
 						.decoration(TextDecoration.ITALIC, false)
 		));
 		meta.getPersistentDataContainer().set(KILL_HAMMER_KEY, PersistentDataType.BYTE, (byte) 1);
@@ -88,8 +93,27 @@ public final class OpItems {
 	}
 
 	public static ItemStack createInvincibleHelmet() {
-		ItemStack stack = new ItemStack(Material.COPPER_HELMET);
-		ItemMeta meta = stack.getItemMeta();
+		Material copper = Material.matchMaterial("COPPER_HELMET");
+		ItemStack stack;
+		if (copper != null && copper.isItem()) {
+			stack = new ItemStack(copper);
+			ItemMeta meta = requireMeta(stack, "Invincible Copper Helmet");
+			applyInvHelmetMeta(meta);
+			stack.setItemMeta(meta);
+			return stack;
+		}
+
+		// Fallback: leather helmet dyed copper-colored if copper armor isn't on this server build.
+		stack = new ItemStack(Material.LEATHER_HELMET);
+		LeatherArmorMeta meta = (LeatherArmorMeta) requireMeta(stack, "Invincible Copper Helmet");
+		meta.setColor(Color.fromRGB(184, 115, 51));
+		applyInvHelmetMeta(meta);
+		meta.addItemFlags(ItemFlag.HIDE_DYE);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
+	private static void applyInvHelmetMeta(ItemMeta meta) {
 		meta.displayName(Component.text("Invincible Copper Helmet", NamedTextColor.GOLD)
 				.decoration(TextDecoration.ITALIC, false));
 		meta.lore(List.of(
@@ -103,8 +127,23 @@ public final class OpItems {
 		meta.setUnbreakable(true);
 		meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
 		meta.setEnchantmentGlintOverride(true);
-		stack.setItemMeta(meta);
-		return stack;
+	}
+
+	private static ItemMeta requireMeta(ItemStack stack, String label) {
+		ItemMeta meta = stack.getItemMeta();
+		if (meta == null) {
+			throw new IllegalStateException(label + " has no ItemMeta for " + stack.getType());
+		}
+		return meta;
+	}
+
+	private static Material firstAvailable(Material... materials) {
+		for (Material material : materials) {
+			if (material != null && material.isItem()) {
+				return material;
+			}
+		}
+		return Material.IRON_AXE;
 	}
 
 	public static ItemStack createDespacitoDisc() {

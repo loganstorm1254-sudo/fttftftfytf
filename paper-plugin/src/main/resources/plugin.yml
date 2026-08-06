@@ -6,46 +6,43 @@ authors: [Logan]
 description: OP tools + custom music discs for Paper/Purpur 1.21.11
 website: https://github.com/loganstorm1254-sudo/fttftftfytf
 
+# NOTE: Do not set "permission:" on commands — Paper hides them from tab-complete
+# and the client when the node is missing. Permissions are checked in code instead.
 commands:
   chunkboomerits:
     description: Give Chunk Boomerits (OP only)
     usage: /chunkboomerits [player] [amount]
-    permission: chunkboomerits.give
     aliases: [boomerits, cboomerits]
   givechunkboomerits:
     description: Alias for giving Chunk Boomerits
     usage: /givechunkboomerits <player> [amount]
-    permission: chunkboomerits.give
   kicksword:
     description: Give the Kick Sword (OP only)
     usage: /kicksword [player]
-    permission: chunkboomerits.kicksword
     aliases: [kick_sword, opkicksword]
   killhammer:
     description: Give the Insta Kill Hammer (OP only)
     usage: /killhammer [player]
-    permission: chunkboomerits.killhammer
-    aliases: [instakillhammer, hammer]
+    aliases: [instakillhammer, cbhammer]
   invhelmet:
     description: Give the Invincible Copper Helmet (OP only)
     usage: /invhelmet [player]
-    permission: chunkboomerits.invhelmet
-    aliases: [invinciblehelmet, copperhelmet]
+    aliases: [invinciblehelmet, cbcopperhelmet]
   despacito:
     description: Give the Despacito music disc
     usage: /despacito [player]
-    permission: chunkboomerits.disc
     aliases: [despacitodisc, musicdiscdespacito]
   moskau:
     description: Give the Moskau music disc
     usage: /moskau [player]
-    permission: chunkboomerits.disc
     aliases: [moskaudisc, dschinghiskhan]
   kimjonggoon:
     description: Give the Kim Jong Goon music disc
     usage: /kimjonggoon [player]
-    permission: chunkboomerits.disc
     aliases: [kimjong, hyperbaiter, kimjonggoondisc]
+  cbgive:
+    description: Give any Chunk Boomerits OP item
+    usage: /cbgive <boomerits|kicksword|killhammer|invhelmet|despacito|moskau|kimjonggoon> [player]
 
 permissions:
   chunkboomerits.give:

@@ -3,21 +3,20 @@
 **Paper / Purpur 1.21.11 plugin**
 
 ## Install
-1. Download plugin: `dist/ChunkBoomerits-1.4.0.jar`
-2. Put it in **`plugins/`**
-3. Restart — players are prompted for the resource pack (custom disc audio)
+1. Download plugin: `dist/ChunkBoomerits-1.4.1.jar`
+2. Put it in **`plugins/`** (remove older ChunkBoomerits jars)
+3. **Fully restart** the server (not `/reload`)
+4. Accept the resource pack on join (for music discs)
 
-Resource pack (if needed manually): `dist/ChunkBoomerits-RP.zip`
-
-## Commands
+## Commands (always visible; OP-checked in-game)
 ```
-/chunkboomerits          # OP — delete-chunk ball
-/kicksword               # OP — kick players on hit
-/killhammer              # OP — mace that insta-kills
-/invhelmet               # OP — copper helmet, invincible while worn
-/despacito               # Luis Fonsi - Despacito
-/moskau                  # Dschinghis Khan - Moskau
-/kimjonggoon             # Hyperbaiter - Kim Jong Goon
+/killhammer              # mace — insta-kill
+/invhelmet               # copper helmet — invincible
+/cbgive killhammer
+/cbgive invhelmet
+/kicksword
+/chunkboomerits
+/despacito /moskau /kimjonggoon
 ```
 
-Put a disc in a **jukebox** to play it (resource pack required).
+If a command still missing: check console for `Registered /killhammer` on startup.
