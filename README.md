@@ -2,19 +2,26 @@
 
 Fabric mod for **Minecraft 1.21.11**.
 
-Adds a throwable item — **Chunk Boomerits**. Throw it at terrain and that chunk is deleted instantly.
+Adds an **OP-only** throwable — **Chunk Boomerits**. Throw it to instantly delete a chunk.
+
+## Get the item (operators only)
+
+```
+/chunkboomerits
+/chunkboomerits 16
+/chunkboomerits Steve
+/chunkboomerits @a 4
+```
+
+Requires permission level **2+** (same as `/give`). Not in the creative inventory.
+
+## Install
+
+1. Fabric Loader for 1.21.11 + Fabric API
+2. Drop `dist/chunk-boomerits-1.0.0.jar` into `mods`
 
 ## Build
 
 ```bash
 ./gradlew build
 ```
-
-Jar: `build/libs/chunk-boomerits-1.0.0.jar` (also in `dist/`).
-
-## Use
-
-1. Fabric Loader for 1.21.11 + Fabric API.
-2. Drop the jar into `mods`.
-3. Creative → Tools & Utilities → **Chunk Boomerits**.
-4. Right-click to throw. Hit a chunk to wipe it.

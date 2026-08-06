@@ -4,16 +4,18 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
 
+import com.chunkboomerits.item.ChunkBoomeritsItem;
 import com.chunkboomerits.item.ModItems;
 
 /**
- * The big Chunk Boomerits ball. On impact, deletes the struck chunk.
+ * The big Chunk Boomerits ball. On impact, deletes the struck chunk (OP throwers only).
  */
 public class ChunkBoomeritsEntity extends ThrowableItemProjectile {
 	public ChunkBoomeritsEntity(EntityType<? extends ChunkBoomeritsEntity> type, Level level) {
@@ -41,7 +43,9 @@ public class ChunkBoomeritsEntity extends ThrowableItemProjectile {
 			return;
 		}
 
-		if (this.level() instanceof ServerLevel serverLevel) {
+		Entity owner = this.getOwner();
+		if (owner instanceof Player player && ChunkBoomeritsItem.isOperator(player)
+				&& this.level() instanceof ServerLevel serverLevel) {
 			ChunkLifter.deleteChunk(serverLevel, this.blockPosition());
 		}
 

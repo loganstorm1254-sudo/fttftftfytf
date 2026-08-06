@@ -7,6 +7,7 @@ import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.chunkboomerits.command.ModCommands;
 import com.chunkboomerits.entity.ModEntities;
 import com.chunkboomerits.item.ModItems;
 
@@ -18,7 +19,8 @@ public class ChunkBoomeritsMod implements ModInitializer {
 	public void onInitialize() {
 		ModEntities.register();
 		ModItems.initialize();
-		LOGGER.info("Chunk Boomerits ready — throw the ball to delete a chunk.");
+		ModCommands.register();
+		LOGGER.info("Chunk Boomerits ready — OP-only via /chunkboomerits");
 	}
 
 	public static Identifier id(String path) {
