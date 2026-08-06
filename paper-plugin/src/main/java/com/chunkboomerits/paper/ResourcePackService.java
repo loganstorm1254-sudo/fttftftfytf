@@ -39,7 +39,7 @@ public final class ResourcePackService implements Listener {
 		computeHash();
 
 		if (url == null || url.isBlank()) {
-			plugin.getLogger().warning("No resource-pack.url set. Players need ChunkBoomerits-RP.zip for Despacito audio.");
+			plugin.getLogger().warning("No resource-pack.url set. Players need ChunkBoomerits-RP.zip for custom disc audio.");
 			plugin.getLogger().warning("Pack file: " + packFile.getAbsolutePath());
 		} else {
 			plugin.getLogger().info("Resource pack URL: " + url);

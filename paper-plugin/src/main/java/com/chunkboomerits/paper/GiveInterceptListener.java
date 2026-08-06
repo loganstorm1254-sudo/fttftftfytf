@@ -29,8 +29,8 @@ public final class GiveInterceptListener implements Listener {
 			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?kick_?sword\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
-	private static final Pattern DESPACITO = Pattern.compile(
-			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:despacito|music_?disc_?despacito)\\b(?:\\s+(\\d+))?",
+	private static final Pattern CUSTOM_DISC = Pattern.compile(
+			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(despacito|music_?disc_?despacito|moskau|music_?disc_?moskau|dschinghis_?khan|kimjonggoon|kim_?jong_?goon|music_?disc_?kim_?jong_?goon|kimjong|hyperbaiter)\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
 
@@ -58,34 +58,37 @@ public final class GiveInterceptListener implements Listener {
 
 		Matcher boomerits = BOOMERITS.matcher(message);
 		if (boomerits.find()) {
-			return give(sender, boomerits.group(1), parseAmount(boomerits.group(2)), ItemKind.BOOMERITS);
+			return give(sender, boomerits.group(1), parseAmount(boomerits.group(2)), ItemKind.BOOMERITS, null);
 		}
 
 		Matcher kickSword = KICK_SWORD.matcher(message);
 		if (kickSword.find()) {
-			return give(sender, kickSword.group(1), 1, ItemKind.KICK_SWORD);
+			return give(sender, kickSword.group(1), 1, ItemKind.KICK_SWORD, null);
 		}
 
-		Matcher despacito = DESPACITO.matcher(message);
-		if (despacito.find()) {
-			return give(sender, despacito.group(1), 1, ItemKind.DESPACITO);
+		Matcher disc = CUSTOM_DISC.matcher(message);
+		if (disc.find()) {
+			CustomDisc custom = CustomDisc.fromCommandAlias(disc.group(2));
+			if (custom != null) {
+				return give(sender, disc.group(1), 1, ItemKind.DISC, custom);
+			}
 		}
 
 		return false;
 	}
 
-	private enum ItemKind { BOOMERITS, KICK_SWORD, DESPACITO }
+	private enum ItemKind { BOOMERITS, KICK_SWORD, DISC }
 
-	private boolean give(CommandSender sender, String targetName, int amount, ItemKind kind) {
+	private boolean give(CommandSender sender, String targetName, int amount, ItemKind kind, CustomDisc disc) {
 		String permission = switch (kind) {
 			case BOOMERITS -> "chunkboomerits.give";
 			case KICK_SWORD -> "chunkboomerits.kicksword";
-			case DESPACITO -> "chunkboomerits.disc";
+			case DISC -> "chunkboomerits.disc";
 		};
 		String label = switch (kind) {
 			case BOOMERITS -> "Chunk Boomerits";
 			case KICK_SWORD -> "Kick Sword";
-			case DESPACITO -> "Despacito Disc";
+			case DISC -> disc.itemLabel();
 		};
 
 		if (!sender.hasPermission(permission) && !sender.isOp()) {
@@ -102,7 +105,7 @@ public final class GiveInterceptListener implements Listener {
 		ItemStack stack = switch (kind) {
 			case BOOMERITS -> OpItems.createBoomerits(amount);
 			case KICK_SWORD -> OpItems.createKickSword();
-			case DESPACITO -> OpItems.createDespacitoDisc();
+			case DISC -> disc.create();
 		};
 		target.getInventory().addItem(stack).values()
 				.forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));

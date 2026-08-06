@@ -6,8 +6,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
-import io.papermc.paper.datacomponent.DataComponentTypes;
-
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemFlag;
@@ -17,13 +15,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class OpItems {
-	public static final String DESPACITO_SOUND = "chunkboomerits:music_disc.despacito";
-	/** Despacito length (~4:41) plus a little buffer, in ticks. */
-	public static final long DESPACITO_LENGTH_TICKS = 20L * 285;
-
 	public static NamespacedKey BOOMERITS_KEY;
 	public static NamespacedKey KICK_SWORD_KEY;
-	public static NamespacedKey DESPACITO_KEY;
 
 	private OpItems() {
 	}
@@ -31,7 +24,7 @@ public final class OpItems {
 	public static void init(JavaPlugin plugin) {
 		BOOMERITS_KEY = new NamespacedKey(plugin, "chunk_boomerits");
 		KICK_SWORD_KEY = new NamespacedKey(plugin, "kick_sword");
-		DESPACITO_KEY = new NamespacedKey(plugin, "music_disc_despacito");
+		CustomDisc.init(plugin);
 	}
 
 	public static ItemStack createBoomerits(int amount) {
@@ -73,26 +66,15 @@ public final class OpItems {
 	}
 
 	public static ItemStack createDespacitoDisc() {
-		ItemStack stack = new ItemStack(Material.MUSIC_DISC_CAT);
-		ItemMeta meta = stack.getItemMeta();
-		meta.displayName(Component.text("Music Disc", NamedTextColor.AQUA)
-				.decoration(TextDecoration.ITALIC, false));
-		meta.lore(List.of(
-				Component.text("Luis Fonsi - Despacito", NamedTextColor.GRAY)
-						.decoration(TextDecoration.ITALIC, false)
-						.decoration(TextDecoration.ITALIC, true),
-				Component.text("ft. Daddy Yankee", NamedTextColor.DARK_GRAY)
-						.decoration(TextDecoration.ITALIC, true),
-				Component.text("Play in a jukebox (resource pack required)", NamedTextColor.YELLOW)
-						.decoration(TextDecoration.ITALIC, false)
-		));
-		meta.getPersistentDataContainer().set(DESPACITO_KEY, PersistentDataType.BYTE, (byte) 1);
-		meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
-		meta.setEnchantmentGlintOverride(true);
-		stack.setItemMeta(meta);
-		// Remove vanilla Cat song so the jukebox does not play it under Despacito.
-		stack.unsetData(DataComponentTypes.JUKEBOX_PLAYABLE);
-		return stack;
+		return CustomDisc.DESPACITO.create();
+	}
+
+	public static ItemStack createMoskauDisc() {
+		return CustomDisc.MOSKAU.create();
+	}
+
+	public static ItemStack createKimJongGoonDisc() {
+		return CustomDisc.KIM_JONG_GOON.create();
 	}
 
 	public static boolean isBoomerits(ItemStack stack) {
@@ -104,7 +86,11 @@ public final class OpItems {
 	}
 
 	public static boolean isDespacitoDisc(ItemStack stack) {
-		return hasKey(stack, DESPACITO_KEY);
+		return CustomDisc.DESPACITO.matches(stack);
+	}
+
+	public static boolean isCustomDisc(ItemStack stack) {
+		return CustomDisc.fromItem(stack) != null;
 	}
 
 	private static boolean hasKey(ItemStack stack, NamespacedKey key) {

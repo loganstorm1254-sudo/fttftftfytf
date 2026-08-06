@@ -41,8 +41,20 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 		return new OpGiveCommand("chunkboomerits.kicksword", "Kick Sword", amount -> OpItems.createKickSword(), false);
 	}
 
+	public static OpGiveCommand disc(CustomDisc disc) {
+		return new OpGiveCommand("chunkboomerits.disc", disc.itemLabel(), amount -> disc.create(), false);
+	}
+
 	public static OpGiveCommand despacito() {
-		return new OpGiveCommand("chunkboomerits.disc", "Despacito Disc", amount -> OpItems.createDespacitoDisc(), false);
+		return disc(CustomDisc.DESPACITO);
+	}
+
+	public static OpGiveCommand moskau() {
+		return disc(CustomDisc.MOSKAU);
+	}
+
+	public static OpGiveCommand kimJongGoon() {
+		return disc(CustomDisc.KIM_JONG_GOON);
 	}
 
 	@Override

@@ -1,11 +1,11 @@
-# Chunk Boomerits + Kick Sword + Despacito Disc
+# Chunk Boomerits + Kick Sword + Music Discs
 
 **Paper / Purpur 1.21.11 plugin**
 
 ## Install
-1. Download plugin: `dist/ChunkBoomerits-1.2.1.jar`
+1. Download plugin: `dist/ChunkBoomerits-1.3.0.jar`
 2. Put it in **`plugins/`**
-3. Restart — players are prompted for the resource pack (Despacito audio)
+3. Restart — players are prompted for the resource pack (custom disc audio)
 
 Resource pack (if needed manually): `dist/ChunkBoomerits-RP.zip`
 
@@ -13,8 +13,10 @@ Resource pack (if needed manually): `dist/ChunkBoomerits-RP.zip`
 ```
 /chunkboomerits          # OP — delete-chunk ball
 /kicksword               # OP — kick players on hit
-/despacito               # music disc
-/give @s despacito
+/despacito               # Luis Fonsi - Despacito
+/moskau                  # Dschinghis Khan - Moskau
+/kimjonggoon             # Hyperbaiter - Kim Jong Goon
+/give @s moskau
 ```
 
-Put the Despacito disc in a **jukebox** to play Luis Fonsi - Despacito ft. Daddy Yankee.
+Put a disc in a **jukebox** to play it (resource pack required).

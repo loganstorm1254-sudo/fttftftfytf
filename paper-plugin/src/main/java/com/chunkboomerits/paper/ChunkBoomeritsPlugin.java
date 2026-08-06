@@ -24,6 +24,14 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getCommand("despacito").setExecutor(despacito);
 		getCommand("despacito").setTabCompleter(despacito);
 
+		OpGiveCommand moskau = OpGiveCommand.moskau();
+		getCommand("moskau").setExecutor(moskau);
+		getCommand("moskau").setTabCompleter(moskau);
+
+		OpGiveCommand kimJongGoon = OpGiveCommand.kimJongGoon();
+		getCommand("kimjonggoon").setExecutor(kimJongGoon);
+		getCommand("kimjonggoon").setTabCompleter(kimJongGoon);
+
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
 		getServer().getPluginManager().registerEvents(new GiveInterceptListener(), this);
 		getServer().getPluginManager().registerEvents(new MusicDiscListener(this), this);
@@ -32,7 +40,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Ready: /chunkboomerits, /kicksword, /despacito");
+		getLogger().info("Ready: /chunkboomerits, /kicksword, /despacito, /moskau, /kimjonggoon");
 	}
 
 	public static ChunkBoomeritsPlugin get() {
