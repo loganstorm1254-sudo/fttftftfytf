@@ -1,53 +1,42 @@
 package com.chunkboomerits.entity;
 
-import java.util.Iterator;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.FallingBlockEntity;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 
 import com.chunkboomerits.ChunkBoomeritsMod;
+import com.chunkboomerits.network.AscendingChunkPayload;
 
 /**
- * Pulls a whole chunk out of the world as rising falling-blocks, then eats them at +100.
+ * Clears a chunk quickly and spawns a single rising mesh entity (lag-free).
  */
 public final class ChunkLifter {
-	private static final double RISE_SPEED = 0.42;
-	private static final int MAX_BLOCKS = 12_288;
-
-	/** entity UUID -> Y at which the block gets eaten */
-	private static final Map<UUID, Double> EAT_AT_Y = new ConcurrentHashMap<>();
-
-	private static boolean registered;
+	/** Cap visible shell blocks so huge caves/worlds stay smooth. */
+	private static final int MAX_MESH_BLOCKS = 6_000;
 
 	private ChunkLifter() {
 	}
 
 	public static void ensureRegistered() {
-		if (registered) {
-			return;
-		}
-		registered = true;
-		ServerTickEvents.END_WORLD_TICK.register(ChunkLifter::tickWorld);
+		// Networking + entity registration happens in ModNetworking / ModEntities.
 	}
 
 	public static void liftChunk(ServerLevel level, BlockPos hitPos) {
-		ensureRegistered();
-
 		int chunkX = hitPos.getX() >> 4;
 		int chunkZ = hitPos.getZ() >> 4;
 		LevelChunk chunk = level.getChunk(chunkX, chunkZ);
@@ -57,49 +46,148 @@ public final class ChunkLifter {
 		int originX = chunkX << 4;
 		int originZ = chunkZ << 4;
 
-		int lifted = 0;
+		IntArrayList meshPacked = new IntArrayList();
+		IntArrayList meshStates = new IntArrayList();
+		IntArrayList clearPacked = new IntArrayList();
 
-		for (int y = minY; y <= maxY && lifted < MAX_BLOCKS; y++) {
-			for (int lx = 0; lx < 16 && lifted < MAX_BLOCKS; lx++) {
-				for (int lz = 0; lz < 16 && lifted < MAX_BLOCKS; lz++) {
-					BlockPos pos = new BlockPos(originX + lx, y, originZ + lz);
-					BlockState state = chunk.getBlockState(pos);
+		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
-					if (state.isAir() || !shouldLift(state, level, pos)) {
+		for (int y = minY; y <= maxY; y++) {
+			int sectionIndex = chunk.getSectionIndex(y);
+			LevelChunkSection section = chunk.getSection(sectionIndex);
+			if (section.hasOnlyAir()) {
+				continue;
+			}
+
+			int sy = SectionPos.sectionRelative(y);
+			for (int lx = 0; lx < 16; lx++) {
+				for (int lz = 0; lz < 16; lz++) {
+					BlockState state = section.getBlockState(lx, sy, lz);
+					if (state.isAir()) {
 						continue;
 					}
 
-					BlockEntity blockEntity = level.getBlockEntity(pos);
-					if (blockEntity != null) {
-						level.removeBlockEntity(pos);
+					cursor.set(originX + lx, y, originZ + lz);
+					if (!shouldLift(state, level, cursor)) {
+						continue;
 					}
 
-					// FallingBlockEntity.fall clears the block and spawns the entity.
-					FallingBlockEntity falling = FallingBlockEntity.fall(level, pos, state);
-					falling.setNoGravity(true);
-					falling.setDeltaMovement(0.0, RISE_SPEED, 0.0);
-					falling.dropItem = false;
-					falling.disableDrop();
-					falling.setHurtsEntities(0.0F, 0);
+					clearPacked.add(AscendingChunkPayload.pack(lx, y - minY, lz));
 
-					double eatY = pos.getY() + ChunkBoomeritsMod.EAT_HEIGHT;
-					EAT_AT_Y.put(falling.getUUID(), eatY);
-					lifted++;
+					if (meshPacked.size() < MAX_MESH_BLOCKS && isExposed(chunk, originX, originZ, minY, maxY, lx, y, lz)) {
+						meshPacked.add(AscendingChunkPayload.pack(lx, y - minY, lz));
+						meshStates.add(Block.getId(state));
+					}
 				}
 			}
 		}
 
-		if (lifted > 0) {
-			level.playSound(
-					null,
-					hitPos,
-					SoundEvents.ENDER_DRAGON_FLAP,
-					SoundSource.PLAYERS,
-					1.2F,
-					0.6F
-			);
-			ChunkBoomeritsMod.LOGGER.info("Chunk Boomerits lifted {} blocks from chunk {}, {}", lifted, chunkX, chunkZ);
+		if (clearPacked.isEmpty()) {
+			return;
 		}
+
+		clearBlocks(level, chunk, originX, originZ, minY, clearPacked);
+		resendChunk(level, chunk);
+
+		AscendingChunkEntity ascending = new AscendingChunkEntity(
+				level,
+				originX,
+				minY,
+				originZ,
+				meshPacked.toIntArray(),
+				meshStates.toIntArray()
+		);
+		level.addFreshEntity(ascending);
+
+		level.playSound(null, hitPos, SoundEvents.ENDER_DRAGON_FLAP, SoundSource.PLAYERS, 1.2F, 0.6F);
+		level.sendParticles(
+				ParticleTypes.POOF,
+				hitPos.getX() + 0.5,
+				hitPos.getY() + 1.0,
+				hitPos.getZ() + 0.5,
+				20,
+				1.5, 1.0, 1.5,
+				0.02
+		);
+
+		ChunkBoomeritsMod.LOGGER.info(
+				"Chunk Boomerits lifted chunk {}, {} ({} cleared, {} mesh)",
+				chunkX,
+				chunkZ,
+				clearPacked.size(),
+				meshPacked.size()
+		);
+	}
+
+	private static void clearBlocks(
+			ServerLevel level,
+			LevelChunk chunk,
+			int originX,
+			int originZ,
+			int minY,
+			IntArrayList clearPacked
+	) {
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+		boolean[] touchedSections = new boolean[chunk.getSectionsCount()];
+
+		for (int i = 0; i < clearPacked.size(); i++) {
+			int packed = clearPacked.getInt(i);
+			int lx = AscendingChunkPayload.unpackX(packed);
+			int ly = AscendingChunkPayload.unpackY(packed);
+			int lz = AscendingChunkPayload.unpackZ(packed);
+			int y = minY + ly;
+
+			pos.set(originX + lx, y, originZ + lz);
+
+			BlockEntity blockEntity = chunk.getBlockEntities().get(pos);
+			if (blockEntity != null) {
+				chunk.removeBlockEntity(pos);
+			}
+
+			int sectionIndex = chunk.getSectionIndex(y);
+			LevelChunkSection section = chunk.getSection(sectionIndex);
+			int sy = SectionPos.sectionRelative(y);
+			section.setBlockState(lx, sy, lz, Blocks.AIR.defaultBlockState(), false);
+			touchedSections[sectionIndex] = true;
+		}
+
+		for (int sectionIndex = 0; sectionIndex < touchedSections.length; sectionIndex++) {
+			if (touchedSections[sectionIndex]) {
+				chunk.getSection(sectionIndex).recalcBlockCounts();
+			}
+		}
+
+		chunk.markUnsaved();
+		level.getChunkSource().blockChanged(pos.set(originX, minY, originZ));
+	}
+
+	private static void resendChunk(ServerLevel level, LevelChunk chunk) {
+		ClientboundLevelChunkWithLightPacket packet = new ClientboundLevelChunkWithLightPacket(
+				chunk,
+				level.getLightEngine(),
+				null,
+				null
+		);
+		for (ServerPlayer player : PlayerLookup.tracking(level, chunk.getPos())) {
+			player.connection.send(packet);
+		}
+	}
+
+	private static boolean isExposed(LevelChunk chunk, int originX, int originZ, int minY, int maxY, int lx, int y, int lz) {
+		return !occludes(chunk, originX, originZ, minY, maxY, lx + 1, y, lz)
+				|| !occludes(chunk, originX, originZ, minY, maxY, lx - 1, y, lz)
+				|| !occludes(chunk, originX, originZ, minY, maxY, lx, y + 1, lz)
+				|| !occludes(chunk, originX, originZ, minY, maxY, lx, y - 1, lz)
+				|| !occludes(chunk, originX, originZ, minY, maxY, lx, y, lz + 1)
+				|| !occludes(chunk, originX, originZ, minY, maxY, lx, y, lz - 1);
+	}
+
+	private static boolean occludes(LevelChunk chunk, int originX, int originZ, int minY, int maxY, int lx, int y, int lz) {
+		if (y < minY || y > maxY || lx < 0 || lx > 15 || lz < 0 || lz > 15) {
+			return false;
+		}
+		BlockState state = chunk.getBlockState(new BlockPos(originX + lx, y, originZ + lz));
+		return state.canOcclude();
 	}
 
 	private static boolean shouldLift(BlockState state, ServerLevel level, BlockPos pos) {
@@ -111,75 +199,5 @@ public final class ChunkLifter {
 			return false;
 		}
 		return state.getDestroySpeed(level, pos) >= 0.0F;
-	}
-
-	private static void tickWorld(ServerLevel level) {
-		if (EAT_AT_Y.isEmpty()) {
-			return;
-		}
-
-		Iterator<Map.Entry<UUID, Double>> iterator = EAT_AT_Y.entrySet().iterator();
-		while (iterator.hasNext()) {
-			Map.Entry<UUID, Double> entry = iterator.next();
-			Entity entity = level.getEntity(entry.getKey());
-
-			if (entity == null || entity.isRemoved()) {
-				iterator.remove();
-				continue;
-			}
-
-			entity.setNoGravity(true);
-			entity.setDeltaMovement(0.0, RISE_SPEED, 0.0);
-
-			if (entity.getY() >= entry.getValue()) {
-				eat(level, entity);
-				iterator.remove();
-			}
-		}
-	}
-
-	private static void eat(ServerLevel level, Entity entity) {
-		BlockState particleState = Blocks.STONE.defaultBlockState();
-		if (entity instanceof FallingBlockEntity falling) {
-			particleState = falling.getBlockState();
-		}
-
-		level.sendParticles(
-				new BlockParticleOption(ParticleTypes.BLOCK, particleState),
-				entity.getX(),
-				entity.getY(),
-				entity.getZ(),
-				18,
-				0.35,
-				0.35,
-				0.35,
-				0.12
-		);
-		level.sendParticles(
-				ParticleTypes.SMOKE,
-				entity.getX(),
-				entity.getY(),
-				entity.getZ(),
-				6,
-				0.2,
-				0.2,
-				0.2,
-				0.02
-		);
-
-		if (level.random.nextInt(40) == 0) {
-			level.playSound(
-					null,
-					entity.getX(),
-					entity.getY(),
-					entity.getZ(),
-					SoundEvents.GENERIC_EAT.value(),
-					SoundSource.PLAYERS,
-					0.8F,
-					0.7F + level.random.nextFloat() * 0.4F
-			);
-		}
-
-		entity.discard();
 	}
 }
