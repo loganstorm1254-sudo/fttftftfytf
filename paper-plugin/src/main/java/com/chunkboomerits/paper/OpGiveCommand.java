@@ -3,6 +3,7 @@ package com.chunkboomerits.paper;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import net.kyori.adventure.text.Component;
@@ -16,11 +17,34 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-public final class ChunkBoomeritsCommand implements CommandExecutor, TabCompleter {
+/**
+ * Shared give logic for OP tools.
+ */
+public final class OpGiveCommand implements CommandExecutor, TabCompleter {
+	private final String permission;
+	private final String itemLabel;
+	private final Function<Integer, ItemStack> factory;
+	private final boolean stackable;
+
+	public OpGiveCommand(String permission, String itemLabel, Function<Integer, ItemStack> factory, boolean stackable) {
+		this.permission = permission;
+		this.itemLabel = itemLabel;
+		this.factory = factory;
+		this.stackable = stackable;
+	}
+
+	public static OpGiveCommand boomerits() {
+		return new OpGiveCommand("chunkboomerits.give", "Chunk Boomerits", OpItems::createBoomerits, true);
+	}
+
+	public static OpGiveCommand kickSword() {
+		return new OpGiveCommand("chunkboomerits.kicksword", "Kick Sword", amount -> OpItems.createKickSword(), false);
+	}
+
 	@Override
 	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-		if (!sender.hasPermission("chunkboomerits.give")) {
-			sender.sendMessage(Component.text("You must be OP to use Chunk Boomerits.", NamedTextColor.RED));
+		if (!sender.hasPermission(permission)) {
+			sender.sendMessage(Component.text("You must be OP to use this.", NamedTextColor.RED));
 			return true;
 		}
 
@@ -29,16 +53,15 @@ public final class ChunkBoomeritsCommand implements CommandExecutor, TabComplete
 
 		if (args.length == 0) {
 			if (!(sender instanceof Player player)) {
-				sender.sendMessage(Component.text("Usage: /" + label + " <player> [amount]", NamedTextColor.RED));
+				sender.sendMessage(Component.text("Usage: /" + label + " <player>" + (stackable ? " [amount]" : ""), NamedTextColor.RED));
 				return true;
 			}
 			target = player;
 		} else if (args.length == 1) {
-			// Could be player name OR amount for self
 			Player maybe = Bukkit.getPlayerExact(args[0]);
 			if (maybe != null) {
 				target = maybe;
-			} else if (sender instanceof Player player) {
+			} else if (stackable && sender instanceof Player player) {
 				try {
 					amount = Integer.parseInt(args[0]);
 					target = player;
@@ -56,32 +79,39 @@ public final class ChunkBoomeritsCommand implements CommandExecutor, TabComplete
 				sender.sendMessage(Component.text("Player not found: " + args[0], NamedTextColor.RED));
 				return true;
 			}
-			try {
-				amount = Integer.parseInt(args[1]);
-			} catch (NumberFormatException ex) {
-				sender.sendMessage(Component.text("Invalid amount: " + args[1], NamedTextColor.RED));
-				return true;
+			if (stackable) {
+				try {
+					amount = Integer.parseInt(args[1]);
+				} catch (NumberFormatException ex) {
+					sender.sendMessage(Component.text("Invalid amount: " + args[1], NamedTextColor.RED));
+					return true;
+				}
 			}
 		}
 
-		amount = Math.max(1, Math.min(64, amount));
-		ItemStack stack = ChunkBoomeritsItems.create(amount);
+		if (!stackable) {
+			amount = 1;
+		} else {
+			amount = Math.max(1, Math.min(64, amount));
+		}
+
+		ItemStack stack = factory.apply(amount);
 		target.getInventory().addItem(stack).values()
 				.forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));
 
 		sender.sendMessage(Component.text(
-				"Gave " + amount + " Chunk Boomerits to " + target.getName(),
+				"Gave " + amount + " " + itemLabel + " to " + target.getName(),
 				NamedTextColor.GREEN
 		));
 		if (!sender.equals(target)) {
-			target.sendMessage(Component.text("You received " + amount + " Chunk Boomerits.", NamedTextColor.GOLD));
+			target.sendMessage(Component.text("You received " + amount + " " + itemLabel + ".", NamedTextColor.GOLD));
 		}
 		return true;
 	}
 
 	@Override
 	public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-		if (!sender.hasPermission("chunkboomerits.give")) {
+		if (!sender.hasPermission(permission)) {
 			return List.of();
 		}
 		if (args.length == 1) {
@@ -90,14 +120,16 @@ public final class ChunkBoomeritsCommand implements CommandExecutor, TabComplete
 					.map(Player::getName)
 					.filter(name -> name.toLowerCase(Locale.ROOT).startsWith(prefix))
 					.collect(Collectors.toCollection(ArrayList::new));
-			for (String n : List.of("1", "16", "64")) {
-				if (n.startsWith(prefix)) {
-					names.add(n);
+			if (stackable) {
+				for (String n : List.of("1", "16", "64")) {
+					if (n.startsWith(prefix)) {
+						names.add(n);
+					}
 				}
 			}
 			return names;
 		}
-		if (args.length == 2) {
+		if (stackable && args.length == 2) {
 			String prefix = args[1].toLowerCase(Locale.ROOT);
 			return List.of("1", "16", "64").stream()
 					.filter(n -> n.startsWith(prefix))

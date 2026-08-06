@@ -1,38 +1,23 @@
-# Chunk Boomerits
+# Chunk Boomerits + Kick Sword
 
-**Paper / Purpur 1.21.11 plugin** (also includes a Fabric mod build).
+**Paper / Purpur 1.21.11 plugin**
 
-## Paper / Purpur install (your error)
+## Install
+1. Download `dist/ChunkBoomerits-1.1.0.jar`
+2. Put it in **`plugins/`** (not `mods/`)
+3. Remove any old `ChunkBoomerits*.jar` / fabric jars from `plugins/`
+4. Restart
 
-You put a **Fabric** jar in `plugins/`. Paper needs a plugin with `plugin.yml`.
-
-1. Download: `dist/ChunkBoomerits-1.0.0.jar`
-2. Put it in your server **`plugins/`** folder (not `mods/`)
-3. Restart the server
-
-### Commands (OP)
+## OP commands
 ```
 /chunkboomerits
-/chunkboomerits 16
-/chunkboomerits Steve 16
 /give @s chunkboomerits
-/give @s chunkboomerits:chunk_boomerits 16
+
+/kicksword
+/give @s kicksword
 ```
 
-Throw the fire-charge-looking item at a chunk to delete it.
+- **Chunk Boomerits** — throw to delete a chunk
+- **Kick Sword** — hit a player to kick them from the server
 
-> Operator Utilities creative tab only exists on the **Fabric client mod**. On Paper/Purpur use the commands above.
-
-## Fabric install (optional)
-
-`dist/chunk-boomerits-fabric-1.0.0.jar` → client/server **`mods/`** folder with Fabric Loader + Fabric API.
-
-## Build
-
-```bash
-# Paper plugin
-cd paper-plugin && ./gradlew build
-
-# Fabric mod
-./gradlew build
-```
+Both are OP-only (`default: op` permissions).

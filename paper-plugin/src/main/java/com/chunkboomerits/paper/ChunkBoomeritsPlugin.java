@@ -8,17 +8,22 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 	@Override
 	public void onEnable() {
 		instance = this;
-		ChunkBoomeritsItems.init(this);
+		OpItems.init(this);
 
-		ChunkBoomeritsCommand command = new ChunkBoomeritsCommand();
-		getCommand("chunkboomerits").setExecutor(command);
-		getCommand("chunkboomerits").setTabCompleter(command);
-		getCommand("givechunkboomerits").setExecutor(command);
-		getCommand("givechunkboomerits").setTabCompleter(command);
+		OpGiveCommand boomerits = OpGiveCommand.boomerits();
+		getCommand("chunkboomerits").setExecutor(boomerits);
+		getCommand("chunkboomerits").setTabCompleter(boomerits);
+		getCommand("givechunkboomerits").setExecutor(boomerits);
+		getCommand("givechunkboomerits").setTabCompleter(boomerits);
 
-		getServer().getPluginManager().registerEvents(new ChunkBoomeritsListener(this), this);
+		OpGiveCommand kickSword = OpGiveCommand.kickSword();
+		getCommand("kicksword").setExecutor(kickSword);
+		getCommand("kicksword").setTabCompleter(kickSword);
+
+		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
 		getServer().getPluginManager().registerEvents(new GiveInterceptListener(), this);
-		getLogger().info("Chunk Boomerits enabled — put this jar in plugins/. OP: /chunkboomerits or /give @s chunkboomerits");
+
+		getLogger().info("OP tools ready: /chunkboomerits, /kicksword, /give @s kicksword");
 	}
 
 	public static ChunkBoomeritsPlugin get() {

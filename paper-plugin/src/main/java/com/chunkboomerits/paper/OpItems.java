@@ -1,0 +1,85 @@
+package com.chunkboomerits.paper;
+
+import java.util.List;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.inventory.ItemFlag;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public final class OpItems {
+	public static NamespacedKey BOOMERITS_KEY;
+	public static NamespacedKey KICK_SWORD_KEY;
+
+	private OpItems() {
+	}
+
+	public static void init(JavaPlugin plugin) {
+		BOOMERITS_KEY = new NamespacedKey(plugin, "chunk_boomerits");
+		KICK_SWORD_KEY = new NamespacedKey(plugin, "kick_sword");
+	}
+
+	public static ItemStack createBoomerits(int amount) {
+		ItemStack stack = new ItemStack(Material.FIRE_CHARGE, clampAmount(amount));
+		ItemMeta meta = stack.getItemMeta();
+		meta.displayName(Component.text("Chunk Boomerits", NamedTextColor.GOLD)
+				.decoration(TextDecoration.ITALIC, false));
+		meta.lore(List.of(
+				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
+				Component.text("Right-click: delete the chunk you hit", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false)
+		));
+		meta.getPersistentDataContainer().set(BOOMERITS_KEY, PersistentDataType.BYTE, (byte) 1);
+		meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+		meta.setEnchantmentGlintOverride(true);
+		meta.setMaxStackSize(64);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
+	public static ItemStack createKickSword() {
+		ItemStack stack = new ItemStack(Material.NETHERITE_SWORD);
+		ItemMeta meta = stack.getItemMeta();
+		meta.displayName(Component.text("Kick Sword", NamedTextColor.LIGHT_PURPLE)
+				.decoration(TextDecoration.ITALIC, false));
+		meta.lore(List.of(
+				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
+				Component.text("Hit a player to kick them from the server", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false),
+				Component.text("Does not deal damage — instant kick", NamedTextColor.DARK_GRAY)
+						.decoration(TextDecoration.ITALIC, false)
+		));
+		meta.getPersistentDataContainer().set(KICK_SWORD_KEY, PersistentDataType.BYTE, (byte) 1);
+		meta.setUnbreakable(true);
+		meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+		meta.setEnchantmentGlintOverride(true);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
+	public static boolean isBoomerits(ItemStack stack) {
+		return hasKey(stack, BOOMERITS_KEY);
+	}
+
+	public static boolean isKickSword(ItemStack stack) {
+		return hasKey(stack, KICK_SWORD_KEY);
+	}
+
+	private static boolean hasKey(ItemStack stack, NamespacedKey key) {
+		if (stack == null || !stack.hasItemMeta() || key == null) {
+			return false;
+		}
+		return stack.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE);
+	}
+
+	private static int clampAmount(int amount) {
+		return Math.max(1, Math.min(64, amount));
+	}
+}

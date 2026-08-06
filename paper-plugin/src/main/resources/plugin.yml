@@ -3,7 +3,7 @@ version: '${version}'
 main: com.chunkboomerits.paper.ChunkBoomeritsPlugin
 api-version: '1.21'
 authors: [Logan]
-description: OP-only Chunk Boomerits — throw to delete a chunk (Paper/Purpur 1.21.11)
+description: OP tools for Paper/Purpur 1.21.11 — Chunk Boomerits + Kick Sword
 website: https://github.com/loganstorm1254-sudo/fttftftfytf
 
 commands:
@@ -13,9 +13,14 @@ commands:
     permission: chunkboomerits.give
     aliases: [boomerits, cboomerits]
   givechunkboomerits:
-    description: Alias that works like /give for Chunk Boomerits
+    description: Alias for giving Chunk Boomerits
     usage: /givechunkboomerits <player> [amount]
     permission: chunkboomerits.give
+  kicksword:
+    description: Give the Kick Sword (OP only)
+    usage: /kicksword [player]
+    permission: chunkboomerits.kicksword
+    aliases: [kick_sword, opkicksword]
 
 permissions:
   chunkboomerits.give:
@@ -24,3 +29,13 @@ permissions:
   chunkboomerits.use:
     description: Throw Chunk Boomerits to delete chunks
     default: op
+  chunkboomerits.kicksword:
+    description: Give and use the Kick Sword
+    default: op
+  chunkboomerits.*:
+    description: All Chunk Boomerits OP tools
+    default: op
+    children:
+      chunkboomerits.give: true
+      chunkboomerits.use: true
+      chunkboomerits.kicksword: true

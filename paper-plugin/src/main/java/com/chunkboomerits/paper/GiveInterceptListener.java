@@ -18,11 +18,15 @@ import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Makes {@code /give <player> chunkboomerits[:chunk_boomerits] [amount]} work on Paper/Purpur.
+ * Makes vanilla-style {@code /give} work for plugin OP items.
  */
 public final class GiveInterceptListener implements Listener {
-	private static final Pattern GIVE = Pattern.compile(
+	private static final Pattern BOOMERITS = Pattern.compile(
 			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?chunk_?boomerits\\b(?:\\s+(\\d+))?",
+			Pattern.CASE_INSENSITIVE
+	);
+	private static final Pattern KICK_SWORD = Pattern.compile(
+			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?kick_?sword\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
 
@@ -46,42 +50,56 @@ public final class GiveInterceptListener implements Listener {
 
 	private boolean tryHandle(CommandSender sender, String raw) {
 		String message = raw.startsWith("/") ? raw.substring(1) : raw;
-		Matcher matcher = GIVE.matcher(message.trim());
-		if (!matcher.find()) {
-			return false;
+		message = message.trim();
+
+		Matcher boomerits = BOOMERITS.matcher(message);
+		if (boomerits.find()) {
+			return give(sender, boomerits.group(1), parseAmount(boomerits.group(2)), true);
 		}
 
-		if (!sender.hasPermission("chunkboomerits.give") && !sender.isOp()) {
-			sender.sendMessage(Component.text("You must be OP to give Chunk Boomerits.", NamedTextColor.RED));
+		Matcher kickSword = KICK_SWORD.matcher(message);
+		if (kickSword.find()) {
+			return give(sender, kickSword.group(1), 1, false);
+		}
+
+		return false;
+	}
+
+	private boolean give(CommandSender sender, String targetName, int amount, boolean boomerits) {
+		String permission = boomerits ? "chunkboomerits.give" : "chunkboomerits.kicksword";
+		String label = boomerits ? "Chunk Boomerits" : "Kick Sword";
+
+		if (!sender.hasPermission(permission) && !sender.isOp()) {
+			sender.sendMessage(Component.text("You must be OP to give " + label + ".", NamedTextColor.RED));
 			return true;
 		}
 
-		String targetName = matcher.group(1);
 		Player target = resolvePlayer(sender, targetName);
 		if (target == null) {
 			sender.sendMessage(Component.text("Player not found: " + targetName, NamedTextColor.RED));
 			return true;
 		}
 
-		int amount = 1;
-		if (matcher.group(2) != null) {
-			try {
-				amount = Integer.parseInt(matcher.group(2));
-			} catch (NumberFormatException ignored) {
-				amount = 1;
-			}
-		}
-		amount = Math.max(1, Math.min(64, amount));
-
-		ItemStack stack = ChunkBoomeritsItems.create(amount);
+		ItemStack stack = boomerits ? OpItems.createBoomerits(amount) : OpItems.createKickSword();
 		target.getInventory().addItem(stack).values()
 				.forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));
 
 		sender.sendMessage(Component.text(
-				"Gave " + amount + " [" + "Chunk Boomerits" + "] to " + target.getName(),
+				"Gave " + (boomerits ? amount + " " : "") + "[" + label + "] to " + target.getName(),
 				NamedTextColor.GREEN
 		));
 		return true;
+	}
+
+	private static int parseAmount(String raw) {
+		if (raw == null) {
+			return 1;
+		}
+		try {
+			return Math.max(1, Math.min(64, Integer.parseInt(raw)));
+		} catch (NumberFormatException ex) {
+			return 1;
+		}
 	}
 
 	private Player resolvePlayer(CommandSender sender, String name) {
@@ -90,7 +108,6 @@ public final class GiveInterceptListener implements Listener {
 			return sender instanceof Player player ? player : null;
 		}
 		if (lower.startsWith("@")) {
-			// Keep simple: only @s/@p; otherwise exact name
 			return null;
 		}
 		return Bukkit.getPlayerExact(name);
