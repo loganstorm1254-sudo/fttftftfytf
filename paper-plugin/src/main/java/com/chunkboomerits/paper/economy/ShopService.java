@@ -17,9 +17,32 @@ import com.chunkboomerits.paper.ChunkBoomeritsPlugin;
 
 /**
  * Admin-set infinite shop stock (totems, etc.).
+ * Stored ItemStacks are never exposed mutably — always use {@link Offer#itemCopy()}.
  */
 public final class ShopService {
-	public record Offer(int id, double price, ItemStack item) {
+	public static final class Offer {
+		private final int id;
+		private final double price;
+		private final ItemStack item;
+
+		public Offer(int id, double price, ItemStack item) {
+			this.id = id;
+			this.price = price;
+			this.item = item.clone();
+		}
+
+		public int id() {
+			return id;
+		}
+
+		public double price() {
+			return price;
+		}
+
+		/** Fresh clone for giving / displaying — never mutates stock. */
+		public ItemStack itemCopy() {
+			return item.clone();
+		}
 	}
 
 	private final ChunkBoomeritsPlugin plugin;
@@ -53,10 +76,10 @@ public final class ShopService {
 				int id = Integer.parseInt(key);
 				double price = row.getDouble("price");
 				ItemStack item = row.getItemStack("item");
-				if (item == null || item.getType().isAir()) {
+				if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
 					continue;
 				}
-				offers.put(id, new Offer(id, price, item.clone()));
+				offers.put(id, new Offer(id, price, item));
 				nextId = Math.max(nextId, id + 1);
 			} catch (Exception ex) {
 				plugin.getLogger().warning("Bad shop offer " + key + ": " + ex.getMessage());
@@ -70,7 +93,7 @@ public final class ShopService {
 		for (Offer offer : offers.values()) {
 			String path = "offers." + offer.id();
 			data.set(path + ".price", offer.price());
-			data.set(path + ".item", offer.item());
+			data.set(path + ".item", offer.itemCopy());
 		}
 		try {
 			plugin.getDataFolder().mkdirs();
@@ -82,7 +105,7 @@ public final class ShopService {
 
 	public synchronized Offer add(double price, ItemStack item) {
 		int id = nextId++;
-		Offer offer = new Offer(id, price, item.clone());
+		Offer offer = new Offer(id, price, item);
 		offers.put(id, offer);
 		save();
 		return offer;

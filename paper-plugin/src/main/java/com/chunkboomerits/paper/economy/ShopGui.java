@@ -13,7 +13,9 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -21,8 +23,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import com.chunkboomerits.paper.ChunkBoomeritsPlugin;
+
 /**
- * Player shop browser — buy admin-set items (totems, etc.).
+ * Player shop browser — buy admin-set items (infinite stock; listings never remove on buy).
  */
 public final class ShopGui implements Listener {
 	private static final String TITLE = "Server Shop";
@@ -61,14 +65,19 @@ public final class ShopGui implements Listener {
 					"Or /sbshovel → Shop Admin"));
 		}
 		inv.setItem(49, button(Material.BARRIER, "Close", NamedTextColor.RED));
-		inv.setItem(48, button(Material.EMERALD, "Your balance: " + economy.format(economy.getBalance(player)), NamedTextColor.GREEN,
-				"Buy with your dollar balance"));
+		paintBalance(inv, player);
 		slotToOffer.put(player.getUniqueId(), map);
 		player.openInventory(inv);
 	}
 
+	private void paintBalance(Inventory inv, Player player) {
+		inv.setItem(48, button(Material.EMERALD, "Your balance: " + economy.format(economy.getBalance(player)), NamedTextColor.GREEN,
+				"Buy with your dollar balance",
+				"Stock is infinite — items stay listed"));
+	}
+
 	private ItemStack display(ShopService.Offer offer) {
-		ItemStack stack = offer.item().clone();
+		ItemStack stack = offer.itemCopy();
 		ItemMeta meta = stack.getItemMeta();
 		if (meta == null) {
 			return stack;
@@ -99,7 +108,7 @@ public final class ShopGui implements Listener {
 		return stack;
 	}
 
-	@EventHandler
+	@EventHandler(priority = EventPriority.HIGH)
 	public void onClick(InventoryClickEvent event) {
 		if (!(event.getWhoClicked() instanceof Player player)) {
 			return;
@@ -109,6 +118,7 @@ public final class ShopGui implements Listener {
 			return;
 		}
 		event.setCancelled(true);
+		event.setResult(Event.Result.DENY);
 		if (event.getClickedInventory() == null || event.getClickedInventory() != event.getView().getTopInventory()) {
 			return;
 		}
@@ -121,24 +131,51 @@ public final class ShopGui implements Listener {
 		if (map == null || !map.containsKey(slot)) {
 			return;
 		}
-		ShopService.Offer offer = shop.get(map.get(slot));
+		int offerId = map.get(slot);
+		ShopService.Offer offer = shop.get(offerId);
 		if (offer == null) {
-			player.sendMessage(Component.text("That offer was removed.", NamedTextColor.RED));
-			open(player);
+			player.sendMessage(Component.text("That offer was removed by an admin.", NamedTextColor.RED));
+			Bukkit.getScheduler().runTask(ChunkBoomeritsPlugin.get(), () -> open(player));
 			return;
 		}
-		if (economy.getBalance(player) < offer.price()) {
-			player.sendMessage(Component.text("Need " + economy.format(offer.price()), NamedTextColor.RED));
-			return;
-		}
-		if (!economy.withdraw(player.getUniqueId(), offer.price())) {
-			player.sendMessage(Component.text("Payment failed.", NamedTextColor.RED));
-			return;
-		}
-		AuctionGui.giveOrDrop(player, offer.item().clone());
-		scoreboard.refresh(player);
-		player.sendMessage(Component.text("Purchased for " + economy.format(offer.price()) + "!", NamedTextColor.GREEN));
-		open(player);
+
+		double price = offer.price();
+		ItemStack product = offer.itemCopy();
+
+		// Run next tick so the click cancel fully applies — keeps listing + bought item stable.
+		Bukkit.getScheduler().runTask(ChunkBoomeritsPlugin.get(), () -> {
+			if (!player.isOnline()) {
+				return;
+			}
+			// Still listed (infinite stock) — never remove on buy.
+			if (shop.get(offerId) == null) {
+				player.sendMessage(Component.text("That offer was removed by an admin.", NamedTextColor.RED));
+				open(player);
+				return;
+			}
+			if (economy.getBalance(player) < price) {
+				player.sendMessage(Component.text("Need " + economy.format(price), NamedTextColor.RED));
+				return;
+			}
+			if (!economy.withdraw(player.getUniqueId(), price)) {
+				player.sendMessage(Component.text("Payment failed.", NamedTextColor.RED));
+				return;
+			}
+			AuctionGui.giveOrDrop(player, product);
+			scoreboard.refresh(player);
+			player.sendMessage(Component.text("Purchased for " + economy.format(price) + "! (still in shop)", NamedTextColor.GREEN));
+
+			// Refresh balance only — do NOT remove the shop listing from the GUI.
+			if (player.getOpenInventory().getTopInventory().getHolder() instanceof GuiHolder h
+					&& h.kind() == GuiHolder.Kind.SHOP) {
+				paintBalance(player.getOpenInventory().getTopInventory(), player);
+				// Re-assert the product icon in case the client cleared the slot visually.
+				player.getOpenInventory().getTopInventory().setItem(slot, display(shop.get(offerId)));
+				player.updateInventory();
+			} else {
+				open(player);
+			}
+		});
 	}
 
 	@EventHandler
@@ -146,6 +183,7 @@ public final class ShopGui implements Listener {
 		if (event.getView().getTopInventory().getHolder() instanceof GuiHolder holder
 				&& holder.kind() == GuiHolder.Kind.SHOP) {
 			event.setCancelled(true);
+			event.setResult(Event.Result.DENY);
 		}
 	}
 }

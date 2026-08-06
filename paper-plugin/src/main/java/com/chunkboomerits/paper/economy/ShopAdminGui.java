@@ -72,7 +72,7 @@ public final class ShopAdminGui implements Listener {
 	}
 
 	private ItemStack display(ShopService.Offer offer) {
-		ItemStack stack = offer.item().clone();
+		ItemStack stack = offer.itemCopy();
 		ItemMeta meta = stack.getItemMeta();
 		if (meta == null) {
 			return stack;
@@ -146,7 +146,7 @@ public final class ShopAdminGui implements Listener {
 		}
 		ShopService.Offer removed = shop.remove(map.get(slot));
 		if (removed != null) {
-			player.sendMessage(Component.text("Removed " + removed.item().getType().name() + " from the shop.", NamedTextColor.YELLOW));
+			player.sendMessage(Component.text("Removed " + removed.itemCopy().getType().name() + " from the shop.", NamedTextColor.YELLOW));
 		}
 		open(player);
 	}
