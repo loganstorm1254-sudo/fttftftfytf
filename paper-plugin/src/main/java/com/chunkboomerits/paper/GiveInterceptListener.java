@@ -38,6 +38,10 @@ public final class GiveInterceptListener implements Listener {
 			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:invincible_?helmet|inv_?helmet|copper_?helmet)\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
+	private static final Pattern SB_SHOVEL = Pattern.compile(
+			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:sb_?shovel|scoreboard_?shovel|eco_?shovel)\\b(?:\\s+(\\d+))?",
+			Pattern.CASE_INSENSITIVE
+	);
 	private static final Pattern CUSTOM_DISC = Pattern.compile(
 			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(despacito|music_?disc_?despacito|moskau|music_?disc_?moskau|dschinghis_?khan|kimjonggoon|kim_?jong_?goon|music_?disc_?kim_?jong_?goon|kimjong|hyperbaiter)\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
@@ -88,6 +92,12 @@ public final class GiveInterceptListener implements Listener {
 		if (invHelmet.find()) {
 			return give(sender, invHelmet.group(1), 1,
 					"chunkboomerits.invhelmet", "Invincible Copper Helmet", false, OpItems::createInvincibleHelmet);
+		}
+
+		Matcher sbShovel = SB_SHOVEL.matcher(message);
+		if (sbShovel.find()) {
+			return give(sender, sbShovel.group(1), 1,
+					"chunkboomerits.scoreboard", "Scoreboard Shovel", false, OpItems::createScoreboardShovel);
 		}
 
 		Matcher disc = CUSTOM_DISC.matcher(message);

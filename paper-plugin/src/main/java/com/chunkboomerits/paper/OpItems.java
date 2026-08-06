@@ -21,6 +21,7 @@ public final class OpItems {
 	public static NamespacedKey KICK_SWORD_KEY;
 	public static NamespacedKey KILL_HAMMER_KEY;
 	public static NamespacedKey INVINCIBLE_HELMET_KEY;
+	public static NamespacedKey SCOREBOARD_SHOVEL_KEY;
 
 	private OpItems() {
 	}
@@ -30,6 +31,7 @@ public final class OpItems {
 		KICK_SWORD_KEY = new NamespacedKey(plugin, "kick_sword");
 		KILL_HAMMER_KEY = new NamespacedKey(plugin, "kill_hammer");
 		INVINCIBLE_HELMET_KEY = new NamespacedKey(plugin, "invincible_helmet");
+		SCOREBOARD_SHOVEL_KEY = new NamespacedKey(plugin, "scoreboard_shovel");
 		CustomDisc.init(plugin);
 	}
 
@@ -113,6 +115,26 @@ public final class OpItems {
 		return stack;
 	}
 
+	public static ItemStack createScoreboardShovel() {
+		ItemStack stack = new ItemStack(Material.GOLDEN_SHOVEL);
+		ItemMeta meta = requireMeta(stack, "Scoreboard Shovel");
+		meta.displayName(Component.text("Scoreboard Shovel", NamedTextColor.GREEN)
+				.decoration(TextDecoration.ITALIC, false));
+		meta.lore(List.of(
+				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
+				Component.text("Right-click: open scoreboard editor", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false),
+				Component.text("Edit $ sidebar colors & animation", NamedTextColor.DARK_GRAY)
+						.decoration(TextDecoration.ITALIC, false)
+		));
+		meta.getPersistentDataContainer().set(SCOREBOARD_SHOVEL_KEY, PersistentDataType.BYTE, (byte) 1);
+		meta.setUnbreakable(true);
+		meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+		meta.setEnchantmentGlintOverride(true);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
 	private static void applyInvHelmetMeta(ItemMeta meta) {
 		meta.displayName(Component.text("Invincible Copper Helmet", NamedTextColor.GOLD)
 				.decoration(TextDecoration.ITALIC, false));
@@ -172,6 +194,10 @@ public final class OpItems {
 
 	public static boolean isInvincibleHelmet(ItemStack stack) {
 		return hasKey(stack, INVINCIBLE_HELMET_KEY);
+	}
+
+	public static boolean isScoreboardShovel(ItemStack stack) {
+		return hasKey(stack, SCOREBOARD_SHOVEL_KEY);
 	}
 
 	public static boolean isDespacitoDisc(ItemStack stack) {

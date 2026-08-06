@@ -3,11 +3,10 @@ version: '${version}'
 main: com.chunkboomerits.paper.ChunkBoomeritsPlugin
 api-version: '1.21'
 authors: [Logan]
-description: OP tools + custom music discs for Paper/Purpur 1.21.11
+description: OP tools, dollar economy, and custom music discs for Paper/Purpur 1.21.11
 website: https://github.com/loganstorm1254-sudo/fttftftfytf
 
-# NOTE: Do not set "permission:" on commands — Paper hides them from tab-complete
-# and the client when the node is missing. Permissions are checked in code instead.
+# NOTE: Do not set "permission:" on commands — Paper hides them from tab-complete.
 commands:
   chunkboomerits:
     description: Give Chunk Boomerits (OP only)
@@ -28,6 +27,10 @@ commands:
     description: Give the Invincible Copper Helmet (OP only)
     usage: /invhelmet [player]
     aliases: [invinciblehelmet, cbcopperhelmet]
+  sbshovel:
+    description: Give the Scoreboard Shovel (OP only)
+    usage: /sbshovel [player]
+    aliases: [scoreboardshovel, ecoshovel]
   despacito:
     description: Give the Despacito music disc
     usage: /despacito [player]
@@ -42,7 +45,24 @@ commands:
     aliases: [kimjong, hyperbaiter, kimjonggoondisc]
   cbgive:
     description: Give any Chunk Boomerits OP item
-    usage: /cbgive <boomerits|kicksword|killhammer|invhelmet|despacito|moskau|kimjonggoon> [player]
+    usage: /cbgive <item> [player]
+  bal:
+    description: Check your dollar balance
+    usage: /bal [player]
+    aliases: [money, cash]
+  balance:
+    description: Check your dollar balance
+    usage: /balance [player]
+  pay:
+    description: Pay another player
+    usage: /pay <player> <amount>
+  eco:
+    description: Manage balances (OP)
+    usage: /eco <give|take|set> <player> <amount>
+    aliases: [economy]
+  baltop:
+    description: Top balances
+    usage: /baltop [amount]
 
 permissions:
   chunkboomerits.give:
@@ -60,9 +80,21 @@ permissions:
   chunkboomerits.invhelmet:
     description: Give the Invincible Copper Helmet
     default: op
+  chunkboomerits.scoreboard:
+    description: Use the Scoreboard Shovel editor
+    default: op
   chunkboomerits.disc:
     description: Give custom music discs
     default: true
+  chunkboomerits.economy.bal:
+    description: Check balances
+    default: true
+  chunkboomerits.economy.pay:
+    description: Pay other players
+    default: true
+  chunkboomerits.economy.eco:
+    description: Admin economy commands
+    default: op
   chunkboomerits.*:
     description: All Chunk Boomerits tools
     default: op
@@ -72,4 +104,8 @@ permissions:
       chunkboomerits.kicksword: true
       chunkboomerits.killhammer: true
       chunkboomerits.invhelmet: true
+      chunkboomerits.scoreboard: true
       chunkboomerits.disc: true
+      chunkboomerits.economy.bal: true
+      chunkboomerits.economy.pay: true
+      chunkboomerits.economy.eco: true
