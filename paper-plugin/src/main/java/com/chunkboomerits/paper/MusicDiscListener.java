@@ -1,9 +1,10 @@
 package com.chunkboomerits.paper;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
+
+import io.papermc.paper.datacomponent.DataComponentTypes;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -11,6 +12,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
 import org.bukkit.block.Jukebox;
@@ -27,6 +29,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Plays Despacito from the custom disc in a jukebox (needs the resource pack).
+ * Silences the vanilla Cat disc song that would otherwise stack on top.
  */
 public final class MusicDiscListener implements Listener {
 	private final ChunkBoomeritsPlugin plugin;
@@ -56,10 +59,12 @@ public final class MusicDiscListener implements Listener {
 		ItemStack hand = player.getInventory().getItemInMainHand();
 		String key = locKey(block.getLocation());
 
-		// Eject / stop if already playing our disc
-		if (event.getAction() == Action.RIGHT_CLICK_BLOCK && jukebox.isPlaying() && playing.containsKey(key)) {
+		// Eject / stop if our disc is in the jukebox (or we are tracking playback)
+		if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+				&& (playing.containsKey(key) || OpItems.isDespacitoDisc(jukebox.getRecord()))
+				&& !OpItems.isDespacitoDisc(hand)) {
 			event.setCancelled(true);
-			stopPlaying(key, true);
+			ejectDisc(block, key);
 			return;
 		}
 
@@ -69,7 +74,7 @@ public final class MusicDiscListener implements Listener {
 		if (!OpItems.isDespacitoDisc(hand)) {
 			return;
 		}
-		if (jukebox.getRecord() != null && jukebox.getRecord().getType() != Material.AIR) {
+		if (jukebox.hasRecord()) {
 			return;
 		}
 
@@ -77,14 +82,35 @@ public final class MusicDiscListener implements Listener {
 
 		ItemStack disc = hand.clone();
 		disc.setAmount(1);
+		// Old discs may still have the Cat jukebox song — strip it before insert.
+		disc.unsetData(DataComponentTypes.JUKEBOX_PLAYABLE);
+
 		if (player.getGameMode() != org.bukkit.GameMode.CREATIVE) {
 			hand.setAmount(hand.getAmount() - 1);
 		}
 
 		jukebox.setRecord(disc);
 		jukebox.update();
+		// If Paper still started vanilla playback, kill it.
+		if (jukebox.isPlaying()) {
+			jukebox.stopPlaying();
+		}
 
-		startPlaying(block.getLocation(), player);
+		Location soundAt = block.getLocation().clone().add(0.5, 0.5, 0.5);
+		silenceVanillaCat(soundAt);
+
+		// Client may start Cat one tick later from the insert packet — silence again, then play Despacito only.
+		Bukkit.getScheduler().runTask(plugin, () -> {
+			if (!(block.getState() instanceof Jukebox jb)) {
+				return;
+			}
+			if (jb.isPlaying()) {
+				jb.stopPlaying();
+			}
+			silenceVanillaCat(soundAt);
+			startPlaying(block.getLocation(), player);
+		});
+
 		player.sendMessage(Component.text("Now playing: Luis Fonsi - Despacito ft. Daddy Yankee", NamedTextColor.AQUA));
 	}
 
@@ -93,44 +119,67 @@ public final class MusicDiscListener implements Listener {
 		if (event.getBlock().getType() != Material.JUKEBOX) {
 			return;
 		}
-		stopPlaying(locKey(event.getBlock().getLocation()), false);
+		String key = locKey(event.getBlock().getLocation());
+		Playing current = playing.remove(key);
+		if (current != null) {
+			current.task.cancel();
+			silenceDespacito(current.location);
+		}
 	}
 
 	private void startPlaying(Location loc, Player starter) {
 		String key = locKey(loc);
-		stopPlaying(key, false);
+		stopSoundOnly(key);
 
 		Location soundAt = loc.clone().add(0.5, 0.5, 0.5);
+		silenceVanillaCat(soundAt);
+
 		for (Player nearby : loc.getWorld().getPlayers()) {
 			if (nearby.getLocation().distanceSquared(soundAt) <= 64 * 64) {
 				nearby.playSound(soundAt, OpItems.DESPACITO_SOUND, SoundCategory.RECORDS, 4.0f, 1.0f);
 			}
 		}
 
-		BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> stopPlaying(key, false), OpItems.DESPACITO_LENGTH_TICKS);
+		BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> stopSoundOnly(key), OpItems.DESPACITO_LENGTH_TICKS);
 		playing.put(key, new Playing(soundAt, task, starter.getUniqueId()));
 	}
 
-	private void stopPlaying(String key, boolean eject) {
+	private void ejectDisc(Block block, String key) {
+		stopSoundOnly(key);
+
+		if (!(block.getState() instanceof Jukebox jukebox)) {
+			return;
+		}
+		ItemStack record = jukebox.getRecord();
+		jukebox.stopPlaying();
+		jukebox.setRecord(null);
+		jukebox.update();
+		if (record != null && record.getType() != Material.AIR) {
+			block.getWorld().dropItemNaturally(block.getLocation().clone().add(0.5, 1.0, 0.5), record);
+		}
+	}
+
+	private void stopSoundOnly(String key) {
 		Playing current = playing.remove(key);
 		if (current == null) {
 			return;
 		}
 		current.task.cancel();
+		silenceDespacito(current.location);
+		silenceVanillaCat(current.location);
+	}
 
-		for (Player nearby : current.location.getWorld().getPlayers()) {
+	private static void silenceDespacito(Location soundAt) {
+		for (Player nearby : soundAt.getWorld().getPlayers()) {
 			nearby.stopSound(OpItems.DESPACITO_SOUND, SoundCategory.RECORDS);
 		}
+	}
 
-		if (eject) {
-			Block block = current.location.getBlock();
-			if (block.getState() instanceof Jukebox jukebox) {
-				ItemStack record = jukebox.getRecord();
-				jukebox.setRecord(null);
-				jukebox.update();
-				if (record != null && record.getType() != Material.AIR) {
-					block.getWorld().dropItemNaturally(current.location, record);
-				}
+	private static void silenceVanillaCat(Location soundAt) {
+		for (Player nearby : soundAt.getWorld().getPlayers()) {
+			if (nearby.getLocation().distanceSquared(soundAt) <= 64 * 64) {
+				nearby.stopSound(Sound.MUSIC_DISC_CAT, SoundCategory.RECORDS);
+				nearby.stopSound(Sound.MUSIC_DISC_CAT);
 			}
 		}
 	}

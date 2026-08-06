@@ -3,7 +3,7 @@
 **Paper / Purpur 1.21.11 plugin**
 
 ## Install
-1. Download plugin: `dist/ChunkBoomerits-1.2.0.jar`
+1. Download plugin: `dist/ChunkBoomerits-1.2.1.jar`
 2. Put it in **`plugins/`**
 3. Restart — players are prompted for the resource pack (Despacito audio)
 

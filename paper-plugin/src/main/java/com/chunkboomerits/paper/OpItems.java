@@ -6,6 +6,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
+import io.papermc.paper.datacomponent.DataComponentTypes;
+
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemFlag;
@@ -88,6 +90,8 @@ public final class OpItems {
 		meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
 		meta.setEnchantmentGlintOverride(true);
 		stack.setItemMeta(meta);
+		// Remove vanilla Cat song so the jukebox does not play it under Despacito.
+		stack.unsetData(DataComponentTypes.JUKEBOX_PLAYABLE);
 		return stack;
 	}
 
