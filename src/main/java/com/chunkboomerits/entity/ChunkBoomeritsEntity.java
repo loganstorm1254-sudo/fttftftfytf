@@ -1,9 +1,6 @@
 package com.chunkboomerits.entity;
 
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -16,7 +13,7 @@ import net.minecraft.world.phys.HitResult;
 import com.chunkboomerits.item.ModItems;
 
 /**
- * The big Chunk Boomerits ball. On impact, launches the struck chunk into the air.
+ * The big Chunk Boomerits ball. On impact, deletes the struck chunk.
  */
 public class ChunkBoomeritsEntity extends ThrowableItemProjectile {
 	public ChunkBoomeritsEntity(EntityType<? extends ChunkBoomeritsEntity> type, Level level) {
@@ -45,29 +42,7 @@ public class ChunkBoomeritsEntity extends ThrowableItemProjectile {
 		}
 
 		if (this.level() instanceof ServerLevel serverLevel) {
-			ChunkLifter.liftChunk(serverLevel, this.blockPosition());
-
-			serverLevel.sendParticles(
-					ParticleTypes.EXPLOSION,
-					this.getX(),
-					this.getY(),
-					this.getZ(),
-					8,
-					0.6,
-					0.6,
-					0.6,
-					0.02
-			);
-			serverLevel.playSound(
-					null,
-					this.getX(),
-					this.getY(),
-					this.getZ(),
-					SoundEvents.GENERIC_EXPLODE.value(),
-					SoundSource.PLAYERS,
-					0.9F,
-					0.7F
-			);
+			ChunkLifter.deleteChunk(serverLevel, this.blockPosition());
 		}
 
 		this.discard();

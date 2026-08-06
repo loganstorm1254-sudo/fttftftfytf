@@ -10,7 +10,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 
 import com.chunkboomerits.ChunkBoomeritsMod;
-import com.chunkboomerits.network.ModNetworking;
 
 public final class ModEntities {
 	public static final EntityType<ChunkBoomeritsEntity> CHUNK_BOOMERITS = register(
@@ -19,15 +18,6 @@ public final class ModEntities {
 					.sized(1.25F, 1.25F)
 					.clientTrackingRange(8)
 					.updateInterval(10)
-	);
-
-	public static final EntityType<AscendingChunkEntity> ASCENDING_CHUNK = register(
-			"ascending_chunk",
-			EntityType.Builder.<AscendingChunkEntity>of(AscendingChunkEntity::new, MobCategory.MISC)
-					.sized(16.0F, 384.0F)
-					.clientTrackingRange(12)
-					.updateInterval(1)
-					.fireImmune()
 	);
 
 	private ModEntities() {
@@ -42,7 +32,6 @@ public final class ModEntities {
 	}
 
 	public static void register() {
-		ModNetworking.register();
-		ChunkLifter.ensureRegistered();
+		// Static init registers entity types.
 	}
 }
