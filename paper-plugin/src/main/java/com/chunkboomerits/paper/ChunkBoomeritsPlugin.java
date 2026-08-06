@@ -62,6 +62,26 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		shop = new ShopService(this);
 		shop.load();
 
+		// Autosave market data every 5 minutes so a crash mid-session keeps shop/AH
+		getServer().getScheduler().runTaskTimer(this, () -> {
+			try {
+				if (shop != null) {
+					shop.save();
+				}
+				if (auctions != null) {
+					auctions.save();
+				}
+				if (economy != null) {
+					economy.save();
+				}
+			} catch (Exception ex) {
+				getLogger().warning("Autosave failed: " + ex.getMessage());
+			}
+		}, 20L * 60 * 5, 20L * 60 * 5);
+
+		getLogger().info("Market data folder (keep this when updating the jar): " + getDataFolder().getAbsolutePath());
+		getLogger().info("Loaded shop offers=" + shop.size() + " AH listings=" + auctions.size());
+
 		EconomyCommands ecoCmds = new EconomyCommands(economy, economyScoreboard);
 		bindEco("bal", ecoCmds);
 		bindEco("balance", ecoCmds);

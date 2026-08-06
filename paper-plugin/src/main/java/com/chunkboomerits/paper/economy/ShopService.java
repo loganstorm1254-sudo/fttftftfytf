@@ -1,7 +1,6 @@
 package com.chunkboomerits.paper.economy;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -16,8 +15,7 @@ import org.bukkit.inventory.ItemStack;
 import com.chunkboomerits.paper.ChunkBoomeritsPlugin;
 
 /**
- * Admin-set infinite shop stock (totems, etc.).
- * Stored ItemStacks are never exposed mutably — always use {@link Offer#itemCopy()}.
+ * Admin-set infinite shop stock. Survives plugin jar updates via Base64 + backups.
  */
 public final class ShopService {
 	public static final class Offer {
@@ -39,7 +37,6 @@ public final class ShopService {
 			return price;
 		}
 
-		/** Fresh clone for giving / displaying — never mutates stock. */
 		public ItemStack itemCopy() {
 			return item.clone();
 		}
@@ -55,52 +52,66 @@ public final class ShopService {
 		this.file = new File(plugin.getDataFolder(), "shop.yml");
 	}
 
-	public void load() {
+	public synchronized void load() {
 		offers.clear();
 		nextId = 1;
 		if (!file.exists()) {
+			plugin.getLogger().info("No shop.yml yet (fresh install).");
 			return;
 		}
+		PersistentItems.backupIfExists(file, plugin.getDataFolder(), plugin.getLogger());
 		FileConfiguration data = YamlConfiguration.loadConfiguration(file);
 		nextId = Math.max(1, data.getInt("next-id", 1));
 		ConfigurationSection section = data.getConfigurationSection("offers");
 		if (section == null) {
+			plugin.getLogger().info("shop.yml loaded (0 offers).");
 			return;
 		}
+		int loaded = 0;
+		int skipped = 0;
 		for (String key : section.getKeys(false)) {
 			ConfigurationSection row = section.getConfigurationSection(key);
 			if (row == null) {
+				skipped++;
 				continue;
 			}
 			try {
 				int id = Integer.parseInt(key);
 				double price = row.getDouble("price");
-				ItemStack item = row.getItemStack("item");
+				ItemStack item = PersistentItems.readItem(row, plugin.getLogger(), "shop#" + key);
+				if (item == null) {
+					item = PersistentItems.simpleFallback(row);
+				}
 				if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
+					skipped++;
+					plugin.getLogger().warning("Skipping shop offer " + key + " (item unreadable).");
 					continue;
 				}
 				offers.put(id, new Offer(id, price, item));
 				nextId = Math.max(nextId, id + 1);
+				loaded++;
 			} catch (Exception ex) {
+				skipped++;
 				plugin.getLogger().warning("Bad shop offer " + key + ": " + ex.getMessage());
 			}
 		}
+		plugin.getLogger().info("shop.yml loaded: " + loaded + " offers" + (skipped > 0 ? " (" + skipped + " skipped)" : "") + ".");
+		// Re-save in durable Base64 format after upgrading from legacy YAML items
+		if (loaded > 0) {
+			save();
+		}
 	}
 
-	public void save() {
+	public synchronized void save() {
 		FileConfiguration data = new YamlConfiguration();
+		data.set("version", 2);
 		data.set("next-id", nextId);
 		for (Offer offer : offers.values()) {
 			String path = "offers." + offer.id();
 			data.set(path + ".price", offer.price());
-			data.set(path + ".item", offer.itemCopy());
+			PersistentItems.writeItem(data, path, offer.itemCopy(), plugin.getLogger());
 		}
-		try {
-			plugin.getDataFolder().mkdirs();
-			data.save(file);
-		} catch (IOException ex) {
-			plugin.getLogger().warning("Could not save shop.yml: " + ex.getMessage());
-		}
+		PersistentItems.saveAtomically(data, file, plugin.getLogger());
 	}
 
 	public synchronized Offer add(double price, ItemStack item) {
@@ -125,5 +136,9 @@ public final class ShopService {
 
 	public synchronized List<Offer> all() {
 		return Collections.unmodifiableList(new ArrayList<>(offers.values()));
+	}
+
+	public synchronized int size() {
+		return offers.size();
 	}
 }

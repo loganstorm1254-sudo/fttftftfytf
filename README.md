@@ -24,5 +24,10 @@ OP add items (no chat needed):
 ```
 Or `/sbshovel` → Shop Admin.
 
-## Economy
-`/bal` `/pay` `/eco` `/baltop`
+## Updating the plugin
+Only replace the **`.jar`** in `plugins/`.  
+Do **not** delete `plugins/ChunkBoomerits/` — that folder holds:
+- `shop.yml` (server shop)
+- `auctions.yml` (AH listings)
+- `economy.yml` (balances)
+- `backups/` (automatic copies on each load)

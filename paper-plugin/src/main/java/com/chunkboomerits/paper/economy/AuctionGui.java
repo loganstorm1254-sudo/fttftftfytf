@@ -84,7 +84,7 @@ public final class AuctionGui implements Listener {
 	}
 
 	private ItemStack display(AuctionService.Listing listing, Player viewer) {
-		ItemStack stack = listing.item().clone();
+		ItemStack stack = listing.itemCopy();
 		ItemMeta meta = stack.getItemMeta();
 		if (meta == null) {
 			return stack;
@@ -198,12 +198,12 @@ public final class AuctionGui implements Listener {
 			return;
 		}
 		if (!economy.withdraw(buyer.getUniqueId(), removed.price())) {
-			auctions.list(removed.seller(), removed.sellerName(), removed.price(), removed.item());
+			auctions.list(removed.seller(), removed.sellerName(), removed.price(), removed.itemCopy());
 			buyer.sendMessage(Component.text("Payment failed.", NamedTextColor.RED));
 			return;
 		}
 		economy.deposit(removed.seller(), removed.price());
-		giveOrDrop(buyer, removed.item().clone());
+		giveOrDrop(buyer, removed.itemCopy());
 		scoreboard.refresh(buyer);
 		Player seller = Bukkit.getPlayer(removed.seller());
 		if (seller != null) {
@@ -224,7 +224,7 @@ public final class AuctionGui implements Listener {
 			open(player);
 			return;
 		}
-		giveOrDrop(player, removed.item().clone());
+		giveOrDrop(player, removed.itemCopy());
 		player.sendMessage(Component.text("Cancelled listing #" + removed.id() + ".", NamedTextColor.YELLOW));
 		open(player);
 	}

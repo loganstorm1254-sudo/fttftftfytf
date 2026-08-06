@@ -1,7 +1,6 @@
 package com.chunkboomerits.paper.economy;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -18,10 +17,43 @@ import org.bukkit.inventory.ItemStack;
 import com.chunkboomerits.paper.ChunkBoomeritsPlugin;
 
 /**
- * Player auction listings persisted to auctions.yml.
+ * Player auction listings. Survives plugin jar updates via Base64 + backups.
  */
 public final class AuctionService {
-	public record Listing(int id, UUID seller, String sellerName, double price, ItemStack item) {
+	public static final class Listing {
+		private final int id;
+		private final UUID seller;
+		private final String sellerName;
+		private final double price;
+		private final ItemStack item;
+
+		public Listing(int id, UUID seller, String sellerName, double price, ItemStack item) {
+			this.id = id;
+			this.seller = seller;
+			this.sellerName = sellerName;
+			this.price = price;
+			this.item = item.clone();
+		}
+
+		public int id() {
+			return id;
+		}
+
+		public UUID seller() {
+			return seller;
+		}
+
+		public String sellerName() {
+			return sellerName;
+		}
+
+		public double price() {
+			return price;
+		}
+
+		public ItemStack itemCopy() {
+			return item.clone();
+		}
 	}
 
 	private final ChunkBoomeritsPlugin plugin;
@@ -34,21 +66,27 @@ public final class AuctionService {
 		this.file = new File(plugin.getDataFolder(), "auctions.yml");
 	}
 
-	public void load() {
+	public synchronized void load() {
 		listings.clear();
 		nextId = 1;
 		if (!file.exists()) {
+			plugin.getLogger().info("No auctions.yml yet (fresh install).");
 			return;
 		}
+		PersistentItems.backupIfExists(file, plugin.getDataFolder(), plugin.getLogger());
 		FileConfiguration data = YamlConfiguration.loadConfiguration(file);
 		nextId = Math.max(1, data.getInt("next-id", 1));
 		ConfigurationSection section = data.getConfigurationSection("listings");
 		if (section == null) {
+			plugin.getLogger().info("auctions.yml loaded (0 listings).");
 			return;
 		}
+		int loaded = 0;
+		int skipped = 0;
 		for (String key : section.getKeys(false)) {
 			ConfigurationSection row = section.getConfigurationSection(key);
 			if (row == null) {
+				skipped++;
 				continue;
 			}
 			try {
@@ -56,39 +94,46 @@ public final class AuctionService {
 				UUID seller = UUID.fromString(row.getString("seller"));
 				String sellerName = row.getString("seller-name", "Unknown");
 				double price = row.getDouble("price");
-				ItemStack item = row.getItemStack("item");
-				if (item == null || item.getType().isAir()) {
+				ItemStack item = PersistentItems.readItem(row, plugin.getLogger(), "ah#" + key);
+				if (item == null) {
+					item = PersistentItems.simpleFallback(row);
+				}
+				if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
+					skipped++;
+					plugin.getLogger().warning("Skipping AH listing " + key + " (item unreadable).");
 					continue;
 				}
-				listings.put(id, new Listing(id, seller, sellerName, price, item.clone()));
+				listings.put(id, new Listing(id, seller, sellerName, price, item));
 				nextId = Math.max(nextId, id + 1);
+				loaded++;
 			} catch (Exception ex) {
+				skipped++;
 				plugin.getLogger().warning("Bad auction listing " + key + ": " + ex.getMessage());
 			}
 		}
+		plugin.getLogger().info("auctions.yml loaded: " + loaded + " listings" + (skipped > 0 ? " (" + skipped + " skipped)" : "") + ".");
+		if (loaded > 0) {
+			save();
+		}
 	}
 
-	public void save() {
+	public synchronized void save() {
 		FileConfiguration data = new YamlConfiguration();
+		data.set("version", 2);
 		data.set("next-id", nextId);
 		for (Listing listing : listings.values()) {
 			String path = "listings." + listing.id();
 			data.set(path + ".seller", listing.seller().toString());
 			data.set(path + ".seller-name", listing.sellerName());
 			data.set(path + ".price", listing.price());
-			data.set(path + ".item", listing.item());
+			PersistentItems.writeItem(data, path, listing.itemCopy(), plugin.getLogger());
 		}
-		try {
-			plugin.getDataFolder().mkdirs();
-			data.save(file);
-		} catch (IOException ex) {
-			plugin.getLogger().warning("Could not save auctions.yml: " + ex.getMessage());
-		}
+		PersistentItems.saveAtomically(data, file, plugin.getLogger());
 	}
 
 	public synchronized Listing list(UUID seller, String sellerName, double price, ItemStack item) {
 		int id = nextId++;
-		Listing listing = new Listing(id, seller, sellerName, price, item.clone());
+		Listing listing = new Listing(id, seller, sellerName, price, item);
 		listings.put(id, listing);
 		save();
 		return listing;
@@ -108,6 +153,10 @@ public final class AuctionService {
 
 	public synchronized List<Listing> all() {
 		return Collections.unmodifiableList(new ArrayList<>(listings.values()));
+	}
+
+	public synchronized int size() {
+		return listings.size();
 	}
 
 	public synchronized int countBySeller(UUID seller) {
