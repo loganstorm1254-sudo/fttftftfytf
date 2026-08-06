@@ -3,7 +3,7 @@ version: '${version}'
 main: com.chunkboomerits.paper.ChunkBoomeritsPlugin
 api-version: '1.21'
 authors: [Logan]
-description: OP tools for Paper/Purpur 1.21.11 — Chunk Boomerits + Kick Sword
+description: OP tools + Despacito music disc for Paper/Purpur 1.21.11
 website: https://github.com/loganstorm1254-sudo/fttftftfytf
 
 commands:
@@ -21,6 +21,11 @@ commands:
     usage: /kicksword [player]
     permission: chunkboomerits.kicksword
     aliases: [kick_sword, opkicksword]
+  despacito:
+    description: Give the Despacito music disc
+    usage: /despacito [player]
+    permission: chunkboomerits.disc
+    aliases: [despacitodisc, musicdiscdespacito]
 
 permissions:
   chunkboomerits.give:
@@ -32,10 +37,14 @@ permissions:
   chunkboomerits.kicksword:
     description: Give and use the Kick Sword
     default: op
+  chunkboomerits.disc:
+    description: Give the Despacito music disc
+    default: true
   chunkboomerits.*:
-    description: All Chunk Boomerits OP tools
+    description: All Chunk Boomerits tools
     default: op
     children:
       chunkboomerits.give: true
       chunkboomerits.use: true
       chunkboomerits.kicksword: true
+      chunkboomerits.disc: true

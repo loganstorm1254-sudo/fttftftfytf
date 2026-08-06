@@ -41,6 +41,10 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 		return new OpGiveCommand("chunkboomerits.kicksword", "Kick Sword", amount -> OpItems.createKickSword(), false);
 	}
 
+	public static OpGiveCommand despacito() {
+		return new OpGiveCommand("chunkboomerits.disc", "Despacito Disc", amount -> OpItems.createDespacitoDisc(), false);
+	}
+
 	@Override
 	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 		if (!sender.hasPermission(permission)) {

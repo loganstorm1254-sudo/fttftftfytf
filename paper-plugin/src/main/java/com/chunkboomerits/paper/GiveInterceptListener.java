@@ -29,6 +29,10 @@ public final class GiveInterceptListener implements Listener {
 			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?kick_?sword\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
+	private static final Pattern DESPACITO = Pattern.compile(
+			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:despacito|music_?disc_?despacito)\\b(?:\\s+(\\d+))?",
+			Pattern.CASE_INSENSITIVE
+	);
 
 	@EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
 	public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
@@ -54,23 +58,38 @@ public final class GiveInterceptListener implements Listener {
 
 		Matcher boomerits = BOOMERITS.matcher(message);
 		if (boomerits.find()) {
-			return give(sender, boomerits.group(1), parseAmount(boomerits.group(2)), true);
+			return give(sender, boomerits.group(1), parseAmount(boomerits.group(2)), ItemKind.BOOMERITS);
 		}
 
 		Matcher kickSword = KICK_SWORD.matcher(message);
 		if (kickSword.find()) {
-			return give(sender, kickSword.group(1), 1, false);
+			return give(sender, kickSword.group(1), 1, ItemKind.KICK_SWORD);
+		}
+
+		Matcher despacito = DESPACITO.matcher(message);
+		if (despacito.find()) {
+			return give(sender, despacito.group(1), 1, ItemKind.DESPACITO);
 		}
 
 		return false;
 	}
 
-	private boolean give(CommandSender sender, String targetName, int amount, boolean boomerits) {
-		String permission = boomerits ? "chunkboomerits.give" : "chunkboomerits.kicksword";
-		String label = boomerits ? "Chunk Boomerits" : "Kick Sword";
+	private enum ItemKind { BOOMERITS, KICK_SWORD, DESPACITO }
+
+	private boolean give(CommandSender sender, String targetName, int amount, ItemKind kind) {
+		String permission = switch (kind) {
+			case BOOMERITS -> "chunkboomerits.give";
+			case KICK_SWORD -> "chunkboomerits.kicksword";
+			case DESPACITO -> "chunkboomerits.disc";
+		};
+		String label = switch (kind) {
+			case BOOMERITS -> "Chunk Boomerits";
+			case KICK_SWORD -> "Kick Sword";
+			case DESPACITO -> "Despacito Disc";
+		};
 
 		if (!sender.hasPermission(permission) && !sender.isOp()) {
-			sender.sendMessage(Component.text("You must be OP to give " + label + ".", NamedTextColor.RED));
+			sender.sendMessage(Component.text("You don't have permission to give " + label + ".", NamedTextColor.RED));
 			return true;
 		}
 
@@ -80,12 +99,16 @@ public final class GiveInterceptListener implements Listener {
 			return true;
 		}
 
-		ItemStack stack = boomerits ? OpItems.createBoomerits(amount) : OpItems.createKickSword();
+		ItemStack stack = switch (kind) {
+			case BOOMERITS -> OpItems.createBoomerits(amount);
+			case KICK_SWORD -> OpItems.createKickSword();
+			case DESPACITO -> OpItems.createDespacitoDisc();
+		};
 		target.getInventory().addItem(stack).values()
 				.forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));
 
 		sender.sendMessage(Component.text(
-				"Gave " + (boomerits ? amount + " " : "") + "[" + label + "] to " + target.getName(),
+				"Gave " + (kind == ItemKind.BOOMERITS ? amount + " " : "") + "[" + label + "] to " + target.getName(),
 				NamedTextColor.GREEN
 		));
 		return true;

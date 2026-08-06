@@ -20,10 +20,19 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getCommand("kicksword").setExecutor(kickSword);
 		getCommand("kicksword").setTabCompleter(kickSword);
 
+		OpGiveCommand despacito = OpGiveCommand.despacito();
+		getCommand("despacito").setExecutor(despacito);
+		getCommand("despacito").setTabCompleter(despacito);
+
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
 		getServer().getPluginManager().registerEvents(new GiveInterceptListener(), this);
+		getServer().getPluginManager().registerEvents(new MusicDiscListener(this), this);
 
-		getLogger().info("OP tools ready: /chunkboomerits, /kicksword, /give @s kicksword");
+		ResourcePackService packs = new ResourcePackService(this);
+		packs.setup();
+		getServer().getPluginManager().registerEvents(packs, this);
+
+		getLogger().info("Ready: /chunkboomerits, /kicksword, /despacito");
 	}
 
 	public static ChunkBoomeritsPlugin get() {

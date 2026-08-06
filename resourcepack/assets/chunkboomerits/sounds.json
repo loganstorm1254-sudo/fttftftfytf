@@ -1,0 +1,11 @@
+{
+  "music_disc.despacito": {
+    "sounds": [
+      {
+        "name": "chunkboomerits:records/despacito",
+        "stream": true,
+        "volume": 1.0
+      }
+    ]
+  }
+}

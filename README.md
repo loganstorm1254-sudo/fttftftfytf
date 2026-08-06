@@ -1,23 +1,20 @@
-# Chunk Boomerits + Kick Sword
+# Chunk Boomerits + Kick Sword + Despacito Disc
 
 **Paper / Purpur 1.21.11 plugin**
 
 ## Install
-1. Download `dist/ChunkBoomerits-1.1.0.jar`
-2. Put it in **`plugins/`** (not `mods/`)
-3. Remove any old `ChunkBoomerits*.jar` / fabric jars from `plugins/`
-4. Restart
+1. Download plugin: `dist/ChunkBoomerits-1.2.0.jar`
+2. Put it in **`plugins/`**
+3. Restart — players are prompted for the resource pack (Despacito audio)
 
-## OP commands
+Resource pack (if needed manually): `dist/ChunkBoomerits-RP.zip`
+
+## Commands
 ```
-/chunkboomerits
-/give @s chunkboomerits
-
-/kicksword
-/give @s kicksword
+/chunkboomerits          # OP — delete-chunk ball
+/kicksword               # OP — kick players on hit
+/despacito               # music disc
+/give @s despacito
 ```
 
-- **Chunk Boomerits** — throw to delete a chunk
-- **Kick Sword** — hit a player to kick them from the server
-
-Both are OP-only (`default: op` permissions).
+Put the Despacito disc in a **jukebox** to play Luis Fonsi - Despacito ft. Daddy Yankee.
