@@ -20,6 +20,14 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getCommand("kicksword").setExecutor(kickSword);
 		getCommand("kicksword").setTabCompleter(kickSword);
 
+		OpGiveCommand killHammer = OpGiveCommand.killHammer();
+		getCommand("killhammer").setExecutor(killHammer);
+		getCommand("killhammer").setTabCompleter(killHammer);
+
+		OpGiveCommand invHelmet = OpGiveCommand.invincibleHelmet();
+		getCommand("invhelmet").setExecutor(invHelmet);
+		getCommand("invhelmet").setTabCompleter(invHelmet);
+
 		OpGiveCommand despacito = OpGiveCommand.despacito();
 		getCommand("despacito").setExecutor(despacito);
 		getCommand("despacito").setTabCompleter(despacito);
@@ -33,6 +41,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getCommand("kimjonggoon").setTabCompleter(kimJongGoon);
 
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
+		getServer().getPluginManager().registerEvents(new InvincibleHelmetListener(), this);
 		getServer().getPluginManager().registerEvents(new GiveInterceptListener(), this);
 		getServer().getPluginManager().registerEvents(new MusicDiscListener(this), this);
 
@@ -40,7 +49,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Ready: /chunkboomerits, /kicksword, /despacito, /moskau, /kimjonggoon");
+		getLogger().info("Ready: /chunkboomerits, /kicksword, /killhammer, /invhelmet, /despacito, /moskau, /kimjonggoon");
 	}
 
 	public static ChunkBoomeritsPlugin get() {

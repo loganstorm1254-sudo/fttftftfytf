@@ -21,6 +21,16 @@ commands:
     usage: /kicksword [player]
     permission: chunkboomerits.kicksword
     aliases: [kick_sword, opkicksword]
+  killhammer:
+    description: Give the Insta Kill Hammer (OP only)
+    usage: /killhammer [player]
+    permission: chunkboomerits.killhammer
+    aliases: [instakillhammer, hammer]
+  invhelmet:
+    description: Give the Invincible Copper Helmet (OP only)
+    usage: /invhelmet [player]
+    permission: chunkboomerits.invhelmet
+    aliases: [invinciblehelmet, copperhelmet]
   despacito:
     description: Give the Despacito music disc
     usage: /despacito [player]
@@ -47,6 +57,12 @@ permissions:
   chunkboomerits.kicksword:
     description: Give and use the Kick Sword
     default: op
+  chunkboomerits.killhammer:
+    description: Give and use the Insta Kill Hammer
+    default: op
+  chunkboomerits.invhelmet:
+    description: Give the Invincible Copper Helmet
+    default: op
   chunkboomerits.disc:
     description: Give custom music discs
     default: true
@@ -57,4 +73,6 @@ permissions:
       chunkboomerits.give: true
       chunkboomerits.use: true
       chunkboomerits.kicksword: true
+      chunkboomerits.killhammer: true
+      chunkboomerits.invhelmet: true
       chunkboomerits.disc: true

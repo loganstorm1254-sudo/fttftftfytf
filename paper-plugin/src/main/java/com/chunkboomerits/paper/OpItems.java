@@ -17,6 +17,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class OpItems {
 	public static NamespacedKey BOOMERITS_KEY;
 	public static NamespacedKey KICK_SWORD_KEY;
+	public static NamespacedKey KILL_HAMMER_KEY;
+	public static NamespacedKey INVINCIBLE_HELMET_KEY;
 
 	private OpItems() {
 	}
@@ -24,6 +26,8 @@ public final class OpItems {
 	public static void init(JavaPlugin plugin) {
 		BOOMERITS_KEY = new NamespacedKey(plugin, "chunk_boomerits");
 		KICK_SWORD_KEY = new NamespacedKey(plugin, "kick_sword");
+		KILL_HAMMER_KEY = new NamespacedKey(plugin, "kill_hammer");
+		INVINCIBLE_HELMET_KEY = new NamespacedKey(plugin, "invincible_helmet");
 		CustomDisc.init(plugin);
 	}
 
@@ -65,6 +69,44 @@ public final class OpItems {
 		return stack;
 	}
 
+	public static ItemStack createKillHammer() {
+		ItemStack stack = new ItemStack(Material.MACE);
+		ItemMeta meta = stack.getItemMeta();
+		meta.displayName(Component.text("Insta Kill Hammer", NamedTextColor.RED)
+				.decoration(TextDecoration.ITALIC, false));
+		meta.lore(List.of(
+				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
+				Component.text("Hit anything to kill it instantly", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false)
+		));
+		meta.getPersistentDataContainer().set(KILL_HAMMER_KEY, PersistentDataType.BYTE, (byte) 1);
+		meta.setUnbreakable(true);
+		meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+		meta.setEnchantmentGlintOverride(true);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
+	public static ItemStack createInvincibleHelmet() {
+		ItemStack stack = new ItemStack(Material.COPPER_HELMET);
+		ItemMeta meta = stack.getItemMeta();
+		meta.displayName(Component.text("Invincible Copper Helmet", NamedTextColor.GOLD)
+				.decoration(TextDecoration.ITALIC, false));
+		meta.lore(List.of(
+				Component.text("OP Armor", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
+				Component.text("Helmet only — wear to become invincible", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false),
+				Component.text("Nothing can kill you while worn", NamedTextColor.DARK_GRAY)
+						.decoration(TextDecoration.ITALIC, false)
+		));
+		meta.getPersistentDataContainer().set(INVINCIBLE_HELMET_KEY, PersistentDataType.BYTE, (byte) 1);
+		meta.setUnbreakable(true);
+		meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+		meta.setEnchantmentGlintOverride(true);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
 	public static ItemStack createDespacitoDisc() {
 		return CustomDisc.DESPACITO.create();
 	}
@@ -83,6 +125,14 @@ public final class OpItems {
 
 	public static boolean isKickSword(ItemStack stack) {
 		return hasKey(stack, KICK_SWORD_KEY);
+	}
+
+	public static boolean isKillHammer(ItemStack stack) {
+		return hasKey(stack, KILL_HAMMER_KEY);
+	}
+
+	public static boolean isInvincibleHelmet(ItemStack stack) {
+		return hasKey(stack, INVINCIBLE_HELMET_KEY);
 	}
 
 	public static boolean isDespacitoDisc(ItemStack stack) {

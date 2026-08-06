@@ -6,6 +6,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Sound;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Snowball;
 import org.bukkit.event.EventHandler;
@@ -113,5 +114,41 @@ public final class OpToolsListener implements Listener {
 
 		attacker.sendMessage(Component.text("Kicked " + victim.getName() + " from the server.", NamedTextColor.LIGHT_PURPLE));
 		ChunkBoomeritsPlugin.get().getLogger().info(attacker.getName() + " kick-sworded " + victim.getName());
+	}
+
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+	public void onKillHammerHit(EntityDamageByEntityEvent event) {
+		if (!(event.getDamager() instanceof Player attacker)) {
+			return;
+		}
+		if (!(event.getEntity() instanceof LivingEntity victim)) {
+			return;
+		}
+
+		ItemStack weapon = attacker.getInventory().getItemInMainHand();
+		if (!OpItems.isKillHammer(weapon)) {
+			return;
+		}
+
+		event.setCancelled(true);
+
+		if (!attacker.hasPermission("chunkboomerits.killhammer")) {
+			attacker.sendMessage(Component.text("Insta Kill Hammer is OP-only.", NamedTextColor.RED));
+			return;
+		}
+
+		if (victim instanceof Player playerVictim && OpItems.isInvincibleHelmet(playerVictim.getInventory().getHelmet())) {
+			attacker.sendMessage(Component.text(playerVictim.getName() + " is invincible.", NamedTextColor.YELLOW));
+			victim.getWorld().playSound(victim.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1.0f, 0.8f);
+			return;
+		}
+
+		victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 0.5f);
+		victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.35f, 1.6f);
+		victim.setHealth(0.0);
+
+		if (victim instanceof Player killed) {
+			attacker.sendMessage(Component.text("Insta-killed " + killed.getName() + ".", NamedTextColor.RED));
+		}
 	}
 }

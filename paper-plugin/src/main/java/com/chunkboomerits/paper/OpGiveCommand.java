@@ -41,6 +41,14 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 		return new OpGiveCommand("chunkboomerits.kicksword", "Kick Sword", amount -> OpItems.createKickSword(), false);
 	}
 
+	public static OpGiveCommand killHammer() {
+		return new OpGiveCommand("chunkboomerits.killhammer", "Insta Kill Hammer", amount -> OpItems.createKillHammer(), false);
+	}
+
+	public static OpGiveCommand invincibleHelmet() {
+		return new OpGiveCommand("chunkboomerits.invhelmet", "Invincible Copper Helmet", amount -> OpItems.createInvincibleHelmet(), false);
+	}
+
 	public static OpGiveCommand disc(CustomDisc disc) {
 		return new OpGiveCommand("chunkboomerits.disc", disc.itemLabel(), amount -> disc.create(), false);
 	}

@@ -1,6 +1,7 @@
 package com.chunkboomerits.paper;
 
 import java.util.Locale;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +28,14 @@ public final class GiveInterceptListener implements Listener {
 	);
 	private static final Pattern KICK_SWORD = Pattern.compile(
 			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?kick_?sword\\b(?:\\s+(\\d+))?",
+			Pattern.CASE_INSENSITIVE
+	);
+	private static final Pattern KILL_HAMMER = Pattern.compile(
+			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:kill_?hammer|insta_?kill_?hammer|hammer)\\b(?:\\s+(\\d+))?",
+			Pattern.CASE_INSENSITIVE
+	);
+	private static final Pattern INV_HELMET = Pattern.compile(
+			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:invincible_?helmet|inv_?helmet|copper_?helmet)\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
 	private static final Pattern CUSTOM_DISC = Pattern.compile(
@@ -58,39 +67,50 @@ public final class GiveInterceptListener implements Listener {
 
 		Matcher boomerits = BOOMERITS.matcher(message);
 		if (boomerits.find()) {
-			return give(sender, boomerits.group(1), parseAmount(boomerits.group(2)), ItemKind.BOOMERITS, null);
+			int amount = parseAmount(boomerits.group(2));
+			return give(sender, boomerits.group(1), amount,
+					"chunkboomerits.give", "Chunk Boomerits", true, () -> OpItems.createBoomerits(amount));
 		}
 
 		Matcher kickSword = KICK_SWORD.matcher(message);
 		if (kickSword.find()) {
-			return give(sender, kickSword.group(1), 1, ItemKind.KICK_SWORD, null);
+			return give(sender, kickSword.group(1), 1,
+					"chunkboomerits.kicksword", "Kick Sword", false, OpItems::createKickSword);
+		}
+
+		Matcher killHammer = KILL_HAMMER.matcher(message);
+		if (killHammer.find()) {
+			return give(sender, killHammer.group(1), 1,
+					"chunkboomerits.killhammer", "Insta Kill Hammer", false, OpItems::createKillHammer);
+		}
+
+		Matcher invHelmet = INV_HELMET.matcher(message);
+		if (invHelmet.find()) {
+			return give(sender, invHelmet.group(1), 1,
+					"chunkboomerits.invhelmet", "Invincible Copper Helmet", false, OpItems::createInvincibleHelmet);
 		}
 
 		Matcher disc = CUSTOM_DISC.matcher(message);
 		if (disc.find()) {
 			CustomDisc custom = CustomDisc.fromCommandAlias(disc.group(2));
 			if (custom != null) {
-				return give(sender, disc.group(1), 1, ItemKind.DISC, custom);
+				return give(sender, disc.group(1), 1,
+						"chunkboomerits.disc", custom.itemLabel(), false, custom::create);
 			}
 		}
 
 		return false;
 	}
 
-	private enum ItemKind { BOOMERITS, KICK_SWORD, DISC }
-
-	private boolean give(CommandSender sender, String targetName, int amount, ItemKind kind, CustomDisc disc) {
-		String permission = switch (kind) {
-			case BOOMERITS -> "chunkboomerits.give";
-			case KICK_SWORD -> "chunkboomerits.kicksword";
-			case DISC -> "chunkboomerits.disc";
-		};
-		String label = switch (kind) {
-			case BOOMERITS -> "Chunk Boomerits";
-			case KICK_SWORD -> "Kick Sword";
-			case DISC -> disc.itemLabel();
-		};
-
+	private boolean give(
+			CommandSender sender,
+			String targetName,
+			int amount,
+			String permission,
+			String label,
+			boolean showAmount,
+			Supplier<ItemStack> factory
+	) {
 		if (!sender.hasPermission(permission) && !sender.isOp()) {
 			sender.sendMessage(Component.text("You don't have permission to give " + label + ".", NamedTextColor.RED));
 			return true;
@@ -102,16 +122,12 @@ public final class GiveInterceptListener implements Listener {
 			return true;
 		}
 
-		ItemStack stack = switch (kind) {
-			case BOOMERITS -> OpItems.createBoomerits(amount);
-			case KICK_SWORD -> OpItems.createKickSword();
-			case DISC -> disc.create();
-		};
+		ItemStack stack = factory.get();
 		target.getInventory().addItem(stack).values()
 				.forEach(left -> target.getWorld().dropItemNaturally(target.getLocation(), left));
 
 		sender.sendMessage(Component.text(
-				"Gave " + (kind == ItemKind.BOOMERITS ? amount + " " : "") + "[" + label + "] to " + target.getName(),
+				"Gave " + (showAmount ? amount + " " : "") + "[" + label + "] to " + target.getName(),
 				NamedTextColor.GREEN
 		));
 		return true;
