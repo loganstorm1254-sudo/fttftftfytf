@@ -3,7 +3,7 @@
 	"id": "chunkboomerits",
 	"version": "${version}",
 	"name": "Chunk Boomerits",
-	"description": "Throw a big Chunk Boomerits ball at a chunk — it lifts into the air and gets eaten at 100 blocks up.",
+	"description": "OP-only Chunk Boomerits ball — throw it to delete a chunk. Use /chunkboomerits",
 	"authors": [
 		"Logan"
 	],
