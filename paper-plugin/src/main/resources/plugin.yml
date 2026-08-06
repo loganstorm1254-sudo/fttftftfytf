@@ -67,10 +67,20 @@ commands:
     description: Auction house
     usage: /ah | /ah sell <price>
     aliases: [auction, auctions]
+  cbah:
+    description: Auction house (alias that avoids conflicts)
+    usage: /cbah | /cbah sell <price>
   shop:
     description: Server shop
     usage: /shop
     aliases: [store]
+  cbshop:
+    description: Server shop (alias that avoids conflicts)
+    usage: /cbshop
+  shopadd:
+    description: OP — add held item to /shop
+    usage: /shopadd <price>
+    aliases: [cbshopadd]
 
 permissions:
   chunkboomerits.give:

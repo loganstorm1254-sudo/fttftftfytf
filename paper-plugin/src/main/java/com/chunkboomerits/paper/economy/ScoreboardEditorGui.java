@@ -1,9 +1,10 @@
 package com.chunkboomerits.paper.economy;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+
+import io.papermc.paper.event.player.AsyncChatEvent;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -16,8 +17,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -27,7 +27,6 @@ import org.bukkit.inventory.meta.ItemMeta;
  */
 public final class ScoreboardEditorGui implements Listener {
 	private static final String TITLE = "Scoreboard Editor";
-	private static final Set<UUID> OPEN = new HashSet<>();
 	private static final Set<UUID> TITLE_PROMPT = new HashSet<>();
 
 	private final EconomyScoreboard scoreboard;
@@ -37,9 +36,10 @@ public final class ScoreboardEditorGui implements Listener {
 	}
 
 	public void open(Player player) {
-		Inventory inv = Bukkit.createInventory(player, 27, Component.text(TITLE, NamedTextColor.DARK_GREEN));
+		GuiHolder holder = new GuiHolder(GuiHolder.Kind.SCOREBOARD);
+		Inventory inv = Bukkit.createInventory(holder, 27, Component.text(TITLE, NamedTextColor.DARK_GREEN));
+		holder.inventory(inv);
 		paint(inv);
-		OPEN.add(player.getUniqueId());
 		player.openInventory(inv);
 	}
 
@@ -49,7 +49,7 @@ public final class ScoreboardEditorGui implements Listener {
 				scoreboard.isEnabled() ? Material.LIME_DYE : Material.GRAY_DYE,
 				scoreboard.isEnabled() ? "Sidebar: ON" : "Sidebar: OFF",
 				NamedTextColor.GREEN,
-				"Click to toggle the $ balance sidebar"
+				"Click to toggle the dollar balance sidebar"
 		));
 		inv.setItem(12, button(
 				Material.NAME_TAG,
@@ -116,19 +116,16 @@ public final class ScoreboardEditorGui implements Listener {
 		if (!(event.getWhoClicked() instanceof Player player)) {
 			return;
 		}
-		if (!OPEN.contains(player.getUniqueId())) {
-			return;
-		}
-		Component title = event.getView().title();
-		if (!PlainTextComponentSerializer.plainText().serialize(title).equals(TITLE)) {
+		if (!(event.getView().getTopInventory().getHolder() instanceof GuiHolder holder)
+				|| holder.kind() != GuiHolder.Kind.SCOREBOARD) {
 			return;
 		}
 		event.setCancelled(true);
-		if (event.getClickedInventory() == null || event.getCurrentItem() == null || event.getCurrentItem().getType().isAir()) {
+		if (event.getClickedInventory() == null || event.getClickedInventory() != event.getView().getTopInventory()) {
 			return;
 		}
 
-		switch (event.getSlot()) {
+		switch (event.getRawSlot()) {
 			case 10 -> {
 				scoreboard.setEnabled(!scoreboard.isEnabled());
 				player.sendMessage(Component.text("Sidebar " + (scoreboard.isEnabled() ? "enabled" : "disabled") + ".", NamedTextColor.GREEN));
@@ -159,24 +156,25 @@ public final class ScoreboardEditorGui implements Listener {
 				return;
 			}
 		}
-		paint(event.getInventory());
+		paint(event.getView().getTopInventory());
 	}
 
 	@EventHandler
-	public void onClose(InventoryCloseEvent event) {
-		if (event.getPlayer() instanceof Player player) {
-			OPEN.remove(player.getUniqueId());
+	public void onDrag(InventoryDragEvent event) {
+		if (event.getView().getTopInventory().getHolder() instanceof GuiHolder holder
+				&& holder.kind() == GuiHolder.Kind.SCOREBOARD) {
+			event.setCancelled(true);
 		}
 	}
 
 	@EventHandler
-	public void onChat(AsyncPlayerChatEvent event) {
+	public void onChat(AsyncChatEvent event) {
 		Player player = event.getPlayer();
 		if (!TITLE_PROMPT.remove(player.getUniqueId())) {
 			return;
 		}
 		event.setCancelled(true);
-		String msg = event.getMessage().trim();
+		String msg = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
 		Bukkit.getScheduler().runTask(com.chunkboomerits.paper.ChunkBoomeritsPlugin.get(), () -> {
 			if (msg.equalsIgnoreCase("cancel")) {
 				player.sendMessage(Component.text("Cancelled.", NamedTextColor.GRAY));

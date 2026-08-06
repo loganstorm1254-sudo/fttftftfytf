@@ -9,7 +9,6 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -17,12 +16,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-
-import com.chunkboomerits.paper.ChunkBoomeritsPlugin;
 
 /**
  * Browse / buy / cancel auction listings.
@@ -53,7 +50,10 @@ public final class AuctionGui implements Listener {
 		page = Math.max(0, Math.min(page, maxPage));
 		pages.put(player.getUniqueId(), page);
 
-		Inventory inv = Bukkit.createInventory(player, 54, Component.text(TITLE, NamedTextColor.GOLD));
+		GuiHolder holder = new GuiHolder(GuiHolder.Kind.AUCTION);
+		Inventory inv = Bukkit.createInventory(holder, 54, Component.text(TITLE, NamedTextColor.GOLD));
+		holder.inventory(inv);
+
 		Map<Integer, Integer> map = new HashMap<>();
 		int start = page * PAGE_SIZE;
 		int end = Math.min(all.size(), start + PAGE_SIZE);
@@ -63,6 +63,12 @@ public final class AuctionGui implements Listener {
 			inv.setItem(slot, display(listing, player));
 			map.put(slot, listing.id());
 			slot++;
+		}
+
+		if (all.isEmpty()) {
+			inv.setItem(22, nav(Material.HOPPER, "No listings yet", NamedTextColor.GRAY,
+					"Hold an item and run:",
+					"/ah sell <price>"));
 		}
 
 		inv.setItem(45, nav(Material.ARROW, "Previous page", NamedTextColor.YELLOW));
@@ -80,7 +86,10 @@ public final class AuctionGui implements Listener {
 	private ItemStack display(AuctionService.Listing listing, Player viewer) {
 		ItemStack stack = listing.item().clone();
 		ItemMeta meta = stack.getItemMeta();
-		List<Component> lore = meta.hasLore() && meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+		if (meta == null) {
+			return stack;
+		}
+		List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
 		lore.add(Component.empty());
 		lore.add(Component.text("Price: " + economy.format(listing.price()), NamedTextColor.GREEN)
 				.decoration(TextDecoration.ITALIC, false));
@@ -115,24 +124,25 @@ public final class AuctionGui implements Listener {
 		return stack;
 	}
 
+	private static boolean isOurGui(InventoryClickEvent event) {
+		return event.getView().getTopInventory().getHolder() instanceof GuiHolder holder
+				&& holder.kind() == GuiHolder.Kind.AUCTION;
+	}
+
 	@EventHandler
 	public void onClick(InventoryClickEvent event) {
 		if (!(event.getWhoClicked() instanceof Player player)) {
 			return;
 		}
-		if (!slotToListing.containsKey(player.getUniqueId())) {
-			return;
-		}
-		String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
-		if (!title.equals(TITLE)) {
+		if (!isOurGui(event)) {
 			return;
 		}
 		event.setCancelled(true);
-		if (event.getClickedInventory() == null) {
+		if (event.getClickedInventory() == null || event.getClickedInventory() != event.getView().getTopInventory()) {
 			return;
 		}
 
-		int slot = event.getSlot();
+		int slot = event.getRawSlot();
 		if (slot == 49) {
 			player.closeInventory();
 			return;
@@ -145,7 +155,7 @@ public final class AuctionGui implements Listener {
 			open(player, pages.getOrDefault(player.getUniqueId(), 0) + 1);
 			return;
 		}
-		if (slot >= PAGE_SIZE) {
+		if (slot < 0 || slot >= PAGE_SIZE) {
 			return;
 		}
 
@@ -168,10 +178,15 @@ public final class AuctionGui implements Listener {
 		}
 	}
 
-	private void buy(Player buyer, AuctionService.Listing listing) {
-		if (listing.seller().equals(buyer.getUniqueId())) {
-			return;
+	@EventHandler
+	public void onDrag(InventoryDragEvent event) {
+		if (event.getView().getTopInventory().getHolder() instanceof GuiHolder holder
+				&& holder.kind() == GuiHolder.Kind.AUCTION) {
+			event.setCancelled(true);
 		}
+	}
+
+	private void buy(Player buyer, AuctionService.Listing listing) {
 		if (economy.getBalance(buyer) < listing.price()) {
 			buyer.sendMessage(Component.text("Not enough money. Need " + economy.format(listing.price()), NamedTextColor.RED));
 			return;
@@ -218,19 +233,5 @@ public final class AuctionGui implements Listener {
 		Map<Integer, ItemStack> left = player.getInventory().addItem(item);
 		left.values().forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
 		player.updateInventory();
-	}
-
-	@EventHandler
-	public void onClose(InventoryCloseEvent event) {
-		if (event.getPlayer() instanceof Player player) {
-			// Delay clear so reopen from click still works; clear if not reopening same tick
-			UUID id = player.getUniqueId();
-			Bukkit.getScheduler().runTask(ChunkBoomeritsPlugin.get(), () -> {
-				if (player.getOpenInventory() == null
-						|| !PlainTextComponentSerializer.plainText().serialize(player.getOpenInventory().title()).equals(TITLE)) {
-					slotToListing.remove(id);
-				}
-			});
-		}
 	}
 }

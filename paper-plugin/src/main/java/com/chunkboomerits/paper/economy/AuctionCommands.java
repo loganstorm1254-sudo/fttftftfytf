@@ -36,6 +36,10 @@ public final class AuctionCommands implements CommandExecutor, TabCompleter {
 			sender.sendMessage(Component.text("Players only.", NamedTextColor.RED));
 			return true;
 		}
+		return handle(player, args);
+	}
+
+	public boolean handle(Player player, String[] args) {
 		if (!player.hasPermission("chunkboomerits.auction") && !player.isOp()) {
 			player.sendMessage(Component.text("No permission.", NamedTextColor.RED));
 			return true;

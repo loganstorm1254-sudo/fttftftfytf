@@ -11,8 +11,10 @@ import com.chunkboomerits.paper.economy.EconomyCommands;
 import com.chunkboomerits.paper.economy.EconomyListener;
 import com.chunkboomerits.paper.economy.EconomyScoreboard;
 import com.chunkboomerits.paper.economy.EconomyService;
+import com.chunkboomerits.paper.economy.MarketCommandIntercept;
 import com.chunkboomerits.paper.economy.ScoreboardEditorGui;
 import com.chunkboomerits.paper.economy.ScoreboardShovelListener;
+import com.chunkboomerits.paper.economy.ShopAddCommand;
 import com.chunkboomerits.paper.economy.ShopAdminGui;
 import com.chunkboomerits.paper.economy.ShopCommands;
 import com.chunkboomerits.paper.economy.ShopGui;
@@ -69,16 +71,29 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 
 		AuctionGui auctionGui = new AuctionGui(auctions, economy, economyScoreboard);
 		AuctionCommands auctionCmds = new AuctionCommands(auctions, auctionGui, economy);
-		PluginCommand ah = getCommand("ah");
-		if (ah != null) {
-			ah.setExecutor(auctionCmds);
-			ah.setTabCompleter(auctionCmds);
-		}
+		bindMarket("ah", auctionCmds);
+		bindMarket("cbah", auctionCmds);
 
 		shopGui = new ShopGui(shop, economy, economyScoreboard);
+		ShopCommands shopCmds = new ShopCommands(shopGui);
 		PluginCommand shopCmd = getCommand("shop");
 		if (shopCmd != null) {
-			shopCmd.setExecutor(new ShopCommands(shopGui));
+			shopCmd.setExecutor(shopCmds);
+			getLogger().info("Registered /shop");
+		} else {
+			getLogger().severe("Command /shop missing from plugin.yml");
+		}
+		PluginCommand cbshop = getCommand("cbshop");
+		if (cbshop != null) {
+			cbshop.setExecutor(shopCmds);
+			getLogger().info("Registered /cbshop");
+		}
+
+		ShopAddCommand shopAdd = new ShopAddCommand();
+		PluginCommand shopadd = getCommand("shopadd");
+		if (shopadd != null) {
+			shopadd.setExecutor(shopAdd);
+			getLogger().info("Registered /shopadd");
 		}
 
 		ScoreboardEditorGui editorGui = new ScoreboardEditorGui(economyScoreboard);
@@ -92,6 +107,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getServer().getPluginManager().registerEvents(shopGui, this);
 		getServer().getPluginManager().registerEvents(new ScoreboardShovelListener(hub), this);
 		getServer().getPluginManager().registerEvents(new EconomyListener(economy, economyScoreboard), this);
+		getServer().getPluginManager().registerEvents(new MarketCommandIntercept(auctionCmds, shopGui), this);
 
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
 		getServer().getPluginManager().registerEvents(new InvincibleHelmetListener(), this);
@@ -102,7 +118,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Economy: /bal /pay /ah /shop — OP shovel: /sbshovel (scoreboard + shop admin)");
+		getLogger().info("Market ready: /ah /cbah /shop /cbshop /shopadd — OP shovel: /sbshovel");
 	}
 
 	@Override
@@ -143,12 +159,27 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getLogger().info("Registered /" + name);
 	}
 
+	private void bindMarket(String name, AuctionCommands commands) {
+		PluginCommand pluginCommand = getCommand(name);
+		if (pluginCommand == null) {
+			getLogger().severe("Command /" + name + " is missing from plugin.yml");
+			return;
+		}
+		pluginCommand.setExecutor(commands);
+		pluginCommand.setTabCompleter(commands);
+		getLogger().info("Registered /" + name);
+	}
+
 	public EconomyService economy() {
 		return economy;
 	}
 
 	public EconomyScoreboard economyScoreboard() {
 		return economyScoreboard;
+	}
+
+	public ShopService shop() {
+		return shop;
 	}
 
 	public ShopGui shopGui() {

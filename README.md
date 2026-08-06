@@ -1,31 +1,28 @@
 # Chunk Boomerits + Economy + AH + Shop
 
-**Paper / Purpur 1.21.11 plugin**
+**Paper / Purpur 1.21.11 — jar `1.6.1`**
 
 ## Install
-1. Download: `dist/ChunkBoomerits-1.6.0.jar`
-2. Put in `plugins/` (remove older jars)
-3. Fully restart
+1. Delete ALL old ChunkBoomerits jars from `plugins/`
+2. Put `dist/ChunkBoomerits-1.6.1.jar` in `plugins/`
+3. **Fully restart** (not `/reload`)
+
+## Auction
+```
+/ah                 # or /cbah if /ah is taken
+/ah sell <price>    # list item in hand
+```
+
+## Shop
+```
+/shop               # or /cbshop
+```
+OP add items (no chat needed):
+```
+# hold a totem, then:
+/shopadd 500
+```
+Or `/sbshovel` → Shop Admin.
 
 ## Economy
-```
-/bal  /pay <player> <amount>  /eco ...  /baltop
-```
-
-## Auction house
-```
-/ah                  # browse / buy
-/ah sell <price>     # list item in hand
-```
-Click your own listing to cancel and get the item back.
-
-## Server shop
-```
-/shop                # buy admin-set items (totems, etc.)
-```
-Admins: `/sbshovel` → **Shop Admin** → hold a totem → **Add held item** → type price.
-
-## OP shovel
-```
-/sbshovel            # Scoreboard editor + Shop admin hub
-```
+`/bal` `/pay` `/eco` `/baltop`

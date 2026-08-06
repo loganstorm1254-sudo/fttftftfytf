@@ -7,7 +7,6 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -15,7 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -36,12 +35,14 @@ public final class AdminHubGui implements Listener {
 	}
 
 	public void open(Player player) {
-		Inventory inv = Bukkit.createInventory(player, 27, Component.text(TITLE, NamedTextColor.DARK_GREEN));
+		GuiHolder holder = new GuiHolder(GuiHolder.Kind.ADMIN_HUB);
+		Inventory inv = Bukkit.createInventory(holder, 27, Component.text(TITLE, NamedTextColor.DARK_GREEN));
+		holder.inventory(inv);
 		inv.setItem(11, button(Material.PAINTING, "Scoreboard Editor", NamedTextColor.GREEN,
 				"Colors, animation, sidebar title"));
 		inv.setItem(15, button(Material.TOTEM_OF_UNDYING, "Shop Admin", NamedTextColor.GOLD,
 				"Add items players can buy in /shop",
-				"Hold a totem (or any item) then add it"));
+				"Or hold item + /shopadd <price>"));
 		inv.setItem(22, button(Material.BARRIER, "Close", NamedTextColor.RED));
 		open.add(player.getUniqueId());
 		player.openInventory(inv);
@@ -65,18 +66,15 @@ public final class AdminHubGui implements Listener {
 		if (!(event.getWhoClicked() instanceof Player player)) {
 			return;
 		}
-		if (!open.contains(player.getUniqueId())) {
-			return;
-		}
-		String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
-		if (!title.equals(TITLE)) {
+		if (!(event.getView().getTopInventory().getHolder() instanceof GuiHolder holder)
+				|| holder.kind() != GuiHolder.Kind.ADMIN_HUB) {
 			return;
 		}
 		event.setCancelled(true);
-		if (event.getClickedInventory() == null) {
+		if (event.getClickedInventory() == null || event.getClickedInventory() != event.getView().getTopInventory()) {
 			return;
 		}
-		switch (event.getSlot()) {
+		switch (event.getRawSlot()) {
 			case 11 -> {
 				player.closeInventory();
 				Bukkit.getScheduler().runTask(com.chunkboomerits.paper.ChunkBoomeritsPlugin.get(), () -> scoreboardGui.open(player));
@@ -92,9 +90,10 @@ public final class AdminHubGui implements Listener {
 	}
 
 	@EventHandler
-	public void onClose(InventoryCloseEvent event) {
-		if (event.getPlayer() instanceof Player player) {
-			open.remove(player.getUniqueId());
+	public void onDrag(InventoryDragEvent event) {
+		if (event.getView().getTopInventory().getHolder() instanceof GuiHolder holder
+				&& holder.kind() == GuiHolder.Kind.ADMIN_HUB) {
+			event.setCancelled(true);
 		}
 	}
 }

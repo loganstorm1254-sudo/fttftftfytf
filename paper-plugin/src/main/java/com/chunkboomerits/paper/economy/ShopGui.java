@@ -9,7 +9,6 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -17,12 +16,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-
-import com.chunkboomerits.paper.ChunkBoomeritsPlugin;
 
 /**
  * Player shop browser — buy admin-set items (totems, etc.).
@@ -42,7 +39,10 @@ public final class ShopGui implements Listener {
 	}
 
 	public void open(Player player) {
-		Inventory inv = Bukkit.createInventory(player, 54, Component.text(TITLE, NamedTextColor.AQUA));
+		GuiHolder holder = new GuiHolder(GuiHolder.Kind.SHOP);
+		Inventory inv = Bukkit.createInventory(holder, 54, Component.text(TITLE, NamedTextColor.AQUA));
+		holder.inventory(inv);
+
 		Map<Integer, Integer> map = new HashMap<>();
 		List<ShopService.Offer> offers = shop.all();
 		int slot = 0;
@@ -54,9 +54,15 @@ public final class ShopGui implements Listener {
 			map.put(slot, offer.id());
 			slot++;
 		}
+		if (offers.isEmpty()) {
+			inv.setItem(22, button(Material.BARRIER, "Shop is empty", NamedTextColor.RED,
+					"OP: hold a totem and run:",
+					"/shopadd 500",
+					"Or /sbshovel → Shop Admin"));
+		}
 		inv.setItem(49, button(Material.BARRIER, "Close", NamedTextColor.RED));
 		inv.setItem(48, button(Material.EMERALD, "Your balance: " + economy.format(economy.getBalance(player)), NamedTextColor.GREEN,
-				"Admins set items with the OP shovel"));
+				"Buy with your dollar balance"));
 		slotToOffer.put(player.getUniqueId(), map);
 		player.openInventory(inv);
 	}
@@ -64,7 +70,10 @@ public final class ShopGui implements Listener {
 	private ItemStack display(ShopService.Offer offer) {
 		ItemStack stack = offer.item().clone();
 		ItemMeta meta = stack.getItemMeta();
-		List<Component> lore = meta.hasLore() && meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+		if (meta == null) {
+			return stack;
+		}
+		List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
 		lore.add(Component.empty());
 		lore.add(Component.text("Price: " + economy.format(offer.price()), NamedTextColor.GOLD)
 				.decoration(TextDecoration.ITALIC, false));
@@ -95,18 +104,15 @@ public final class ShopGui implements Listener {
 		if (!(event.getWhoClicked() instanceof Player player)) {
 			return;
 		}
-		if (!slotToOffer.containsKey(player.getUniqueId())) {
-			return;
-		}
-		String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
-		if (!title.equals(TITLE)) {
+		if (!(event.getView().getTopInventory().getHolder() instanceof GuiHolder holder)
+				|| holder.kind() != GuiHolder.Kind.SHOP) {
 			return;
 		}
 		event.setCancelled(true);
-		if (event.getClickedInventory() == null) {
+		if (event.getClickedInventory() == null || event.getClickedInventory() != event.getView().getTopInventory()) {
 			return;
 		}
-		int slot = event.getSlot();
+		int slot = event.getRawSlot();
 		if (slot == 49) {
 			player.closeInventory();
 			return;
@@ -136,15 +142,10 @@ public final class ShopGui implements Listener {
 	}
 
 	@EventHandler
-	public void onClose(InventoryCloseEvent event) {
-		if (event.getPlayer() instanceof Player player) {
-			UUID id = player.getUniqueId();
-			Bukkit.getScheduler().runTask(ChunkBoomeritsPlugin.get(), () -> {
-				if (player.getOpenInventory() == null
-						|| !PlainTextComponentSerializer.plainText().serialize(player.getOpenInventory().title()).equals(TITLE)) {
-					slotToOffer.remove(id);
-				}
-			});
+	public void onDrag(InventoryDragEvent event) {
+		if (event.getView().getTopInventory().getHolder() instanceof GuiHolder holder
+				&& holder.kind() == GuiHolder.Kind.SHOP) {
+			event.setCancelled(true);
 		}
 	}
 }
