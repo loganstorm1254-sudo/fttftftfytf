@@ -1,29 +1,38 @@
 # Chunk Boomerits
 
-Fabric mod for **Minecraft 1.21.11**.
+**Paper / Purpur 1.21.11 plugin** (also includes a Fabric mod build).
 
-OP-only throwable that deletes a chunk on hit.
+## Paper / Purpur install (your error)
 
-## Get the item
+You put a **Fabric** jar in `plugins/`. Paper needs a plugin with `plugin.yml`.
 
-**Creative:** Operator Utilities tab (cheats/OP required to see that tab)
+1. Download: `dist/ChunkBoomerits-1.0.0.jar`
+2. Put it in your server **`plugins/`** folder (not `mods/`)
+3. Restart the server
 
-**Commands:**
+### Commands (OP)
 ```
-/give @s chunkboomerits:chunk_boomerits
-/give @s chunkboomerits:chunk_boomerits 16
 /chunkboomerits
-/boomerits
+/chunkboomerits 16
+/chunkboomerits Steve 16
+/give @s chunkboomerits
+/give @s chunkboomerits:chunk_boomerits 16
 ```
 
-## Install
+Throw the fire-charge-looking item at a chunk to delete it.
 
-1. Fabric Loader + Fabric API for 1.21.11
-2. Drop `dist/chunk-boomerits-1.0.0.jar` into `mods`
-3. Restart
+> Operator Utilities creative tab only exists on the **Fabric client mod**. On Paper/Purpur use the commands above.
+
+## Fabric install (optional)
+
+`dist/chunk-boomerits-fabric-1.0.0.jar` → client/server **`mods/`** folder with Fabric Loader + Fabric API.
 
 ## Build
 
 ```bash
+# Paper plugin
+cd paper-plugin && ./gradlew build
+
+# Fabric mod
 ./gradlew build
 ```

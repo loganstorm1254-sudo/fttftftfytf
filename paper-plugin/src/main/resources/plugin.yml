@@ -1,0 +1,26 @@
+name: ChunkBoomerits
+version: '${version}'
+main: com.chunkboomerits.paper.ChunkBoomeritsPlugin
+api-version: '1.21'
+authors: [Logan]
+description: OP-only Chunk Boomerits — throw to delete a chunk (Paper/Purpur 1.21.11)
+website: https://github.com/loganstorm1254-sudo/fttftftfytf
+
+commands:
+  chunkboomerits:
+    description: Give Chunk Boomerits (OP only)
+    usage: /chunkboomerits [player] [amount]
+    permission: chunkboomerits.give
+    aliases: [boomerits, cboomerits]
+  givechunkboomerits:
+    description: Alias that works like /give for Chunk Boomerits
+    usage: /givechunkboomerits <player> [amount]
+    permission: chunkboomerits.give
+
+permissions:
+  chunkboomerits.give:
+    description: Give and use Chunk Boomerits
+    default: op
+  chunkboomerits.use:
+    description: Throw Chunk Boomerits to delete chunks
+    default: op
