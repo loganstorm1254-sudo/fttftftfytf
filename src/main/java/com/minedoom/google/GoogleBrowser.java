@@ -2,12 +2,14 @@ package com.minedoom.google;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import javax.imageio.ImageIO;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -30,6 +32,10 @@ import java.util.regex.Pattern;
  */
 public final class GoogleBrowser {
 
+    private static final Pattern OG_IMAGE = Pattern.compile(
+            "<meta[^>]*(?:property|name)=[\"'](?:og:image|twitter:image)[\"'][^>]*content=[\"']([^\"']+)[\"']"
+                    + "|<meta[^>]*content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"'](?:og:image|twitter:image)[\"']",
+            Pattern.CASE_INSENSITIVE);
     private static final Pattern TITLE_TAG = Pattern.compile(
             "<title[^>]*>(.*?)</title>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern META_DESC = Pattern.compile(
@@ -53,6 +59,12 @@ public final class GoogleBrowser {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, List<SearchResult>> eldest) {
             return size() > 32;
+        }
+    };
+    private final Map<String, BufferedImage> shotCache = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> eldest) {
+            return size() > 16;
         }
     };
     private volatile String currentUrl = "https://www.google.com/";
@@ -212,39 +224,188 @@ public final class GoogleBrowser {
     }
 
     private byte[] renderExternalPage(String url, int outW, int outH) throws IOException, InterruptedException {
-        String html = fetchHtml(url);
-        String title = firstMatch(TITLE_TAG, html, url);
-        String desc = firstMatch(META_DESC, html, "");
-        title = cleanText(title);
-        desc = cleanText(desc);
-        if (desc.isBlank()) {
+        // Real page preview via remote screenshot (MineKeep can't run Chrome)
+        BufferedImage shot = fetchRemoteScreenshot(url, Math.max(640, Math.min(1280, outW * 2)));
+        if (shot != null) {
+            return composeBrowserView(url, shot, outW, outH, null);
+        }
+
+        String html = "";
+        try {
+            html = fetchHtml(url);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Page fetch failed for " + url + ": " + e.getMessage());
+        }
+
+        BufferedImage og = fetchOgImage(html);
+        if (og != null) {
+            String title = cleanText(firstMatch(TITLE_TAG, html, url));
+            return composeBrowserView(url, og, outW, outH, title);
+        }
+
+        String title = cleanText(firstMatch(TITLE_TAG, html, url));
+        String desc = cleanText(firstMatch(META_DESC, html, ""));
+        if (desc.isBlank() && !html.isBlank()) {
             desc = cleanText(STRIP_TAGS.matcher(html).replaceAll(" "));
             if (desc.length() > 400) {
                 desc = desc.substring(0, 400) + "…";
             }
         }
+        if (desc.isBlank()) {
+            desc = "Could not capture this page (screenshot service busy). Try /google refresh.";
+        }
+
         BufferedImage img = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         enableNice(g);
-        g.setColor(Color.WHITE);
+        g.setColor(new Color(32, 33, 36));
         g.fillRect(0, 0, outW, outH);
-
-        g.setColor(new Color(66, 133, 244));
-        g.fillRect(0, 0, outW, Math.max(28, outH / 10));
+        int barH = Math.max(28, outH / 12);
+        g.setColor(new Color(48, 49, 52));
+        g.fillRect(0, 0, outW, barH);
+        g.setColor(new Color(232, 234, 237));
+        g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(10, barH / 2)));
+        g.drawString(truncate(url, g, outW - 24), 12, barH * 2 / 3);
+        int y = barH + Math.max(24, outH / 12);
         g.setColor(Color.WHITE);
-        g.setFont(new Font("SansSerif", Font.BOLD, Math.max(11, outH / 22)));
-        g.drawString(truncate(url, g, outW - 24), 12, Math.max(18, outH / 14));
-
-        int y = Math.max(44, outH / 7);
-        g.setColor(new Color(26, 13, 171));
         g.setFont(new Font("SansSerif", Font.BOLD, Math.max(14, outH / 16)));
-        y = drawWrappedReturn(g, title, 16, y, outW - 32, Math.max(14, outH / 16));
+        y = drawWrappedReturn(g, title.isBlank() ? url : title, 16, y, outW - 32, Math.max(14, outH / 16));
         y += 12;
-        g.setColor(new Color(60, 64, 67));
+        g.setColor(new Color(189, 193, 198));
         g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(10, outH / 24)));
         drawWrappedReturn(g, desc, 16, y, outW - 32, Math.max(10, outH / 24));
         g.dispose();
         return scaleToRgb(img, outW, outH);
+    }
+
+    private byte[] composeBrowserView(String url, BufferedImage page, int outW, int outH, String caption) {
+        BufferedImage img = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        enableNice(g);
+        int barH = Math.max(22, outH / 14);
+        g.setColor(new Color(48, 49, 52));
+        g.fillRect(0, 0, outW, barH);
+        g.setColor(new Color(60, 64, 67));
+        int pad = Math.max(4, barH / 5);
+        g.fillRoundRect(pad * 2, pad, outW - pad * 4, barH - pad * 2, barH, barH);
+        g.setColor(new Color(232, 234, 237));
+        g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(9, barH / 2)));
+        g.drawString(truncate(url, g, outW - pad * 6), pad * 3, barH - pad - 2);
+
+        int contentH = outH - barH;
+        g.setColor(Color.WHITE);
+        g.fillRect(0, barH, outW, contentH);
+        // cover-fit the screenshot into the content area
+        double scale = Math.max((double) outW / page.getWidth(), (double) contentH / page.getHeight());
+        int dw = (int) Math.round(page.getWidth() * scale);
+        int dh = (int) Math.round(page.getHeight() * scale);
+        int dx = (outW - dw) / 2;
+        int dy = barH + (contentH - dh) / 2;
+        g.drawImage(page, dx, dy, dw, dh, null);
+
+        if (caption != null && !caption.isBlank()) {
+            g.setColor(new Color(0, 0, 0, 160));
+            g.fillRect(0, outH - Math.max(28, outH / 12), outW, Math.max(28, outH / 12));
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("SansSerif", Font.BOLD, Math.max(11, outH / 22)));
+            g.drawString(truncate(caption, g, outW - 24), 12, outH - Math.max(10, outH / 28));
+        }
+        g.dispose();
+        return scaleToRgb(img, outW, outH);
+    }
+
+    private BufferedImage fetchRemoteScreenshot(String pageUrl, int width) {
+        synchronized (shotCache) {
+            BufferedImage cached = shotCache.get(pageUrl);
+            if (cached != null) {
+                return cached;
+            }
+        }
+
+        List<String> endpoints = List.of(
+                "https://image.thum.io/get/width/" + width + "/noanimate/" + pageUrl,
+                "https://image.thum.io/get/width/" + width + "/" + pageUrl,
+                "https://s0.wp.com/mshots/v1/" + URLEncoder.encode(pageUrl, StandardCharsets.UTF_8) + "?w=" + width
+        );
+
+        for (String endpoint : endpoints) {
+            try {
+                byte[] bytes = fetchBytes(endpoint);
+                if (bytes.length < 2000) {
+                    continue; // placeholder / error html
+                }
+                BufferedImage img = ImageIO.read(new ByteArrayInputStream(bytes));
+                if (img == null || img.getWidth() < 64 || img.getHeight() < 64) {
+                    continue;
+                }
+                // mshots sometimes returns a tiny "generating" placeholder
+                if (img.getWidth() < 200 && img.getHeight() < 200) {
+                    continue;
+                }
+                synchronized (shotCache) {
+                    shotCache.put(pageUrl, img);
+                }
+                plugin.getLogger().info("Captured page screenshot via " + URI.create(endpoint).getHost()
+                        + " (" + img.getWidth() + "x" + img.getHeight() + ")");
+                return img;
+            } catch (Exception e) {
+                plugin.getLogger().warning("Screenshot failed (" + safeHost(endpoint) + "): " + e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private BufferedImage fetchOgImage(String html) {
+        if (html == null || html.isBlank()) {
+            return null;
+        }
+        Matcher m = OG_IMAGE.matcher(html);
+        if (!m.find()) {
+            return null;
+        }
+        String src = m.group(1) != null ? m.group(1) : m.group(2);
+        if (src == null || src.isBlank()) {
+            return null;
+        }
+        src = src.replace("&amp;", "&").trim();
+        if (src.startsWith("//")) {
+            src = "https:" + src;
+        }
+        if (!src.startsWith("http")) {
+            return null;
+        }
+        try {
+            byte[] bytes = fetchBytes(src);
+            BufferedImage img = ImageIO.read(new ByteArrayInputStream(bytes));
+            if (img != null && img.getWidth() >= 64) {
+                return img;
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("og:image fetch failed: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static String safeHost(String url) {
+        try {
+            return URI.create(url).getHost();
+        } catch (Exception e) {
+            return "remote";
+        }
+    }
+
+    private byte[] fetchBytes(String url) throws IOException, InterruptedException {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(plugin.getConfig().getInt("google.timeout-seconds", 45)))
+                .header("User-Agent", "MineDoom/1.0 (Minecraft plugin; +https://github.com/loganstorm1254-sudo/fttftftfytf)")
+                .header("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+                .GET()
+                .build();
+        HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+        if (res.statusCode() >= 400) {
+            throw new IOException("HTTP " + res.statusCode());
+        }
+        return res.body();
     }
 
     private byte[] renderMessagePage(int outW, int outH, String title, String message) {
