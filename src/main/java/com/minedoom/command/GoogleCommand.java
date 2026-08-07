@@ -101,21 +101,30 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                 loadUrl(player, screen.get(), browser.searchUrl(query), "Search: " + query);
             }
             case "go", "open", "url" -> {
-                if (args.length < 2) {
-                    player.sendMessage("§cUsage: /google go <url>");
-                    return true;
-                }
                 Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Google screen nearby.");
                     return true;
                 }
-                String url = args[1];
-                if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                    url = "https://" + url;
+                String url;
+                try {
+                    if (args.length >= 2) {
+                        // Join all args — signed video URLs are long and must not be cut at &
+                        url = String.join("", java.util.Arrays.copyOfRange(args, 1, args.length)).trim();
+                    } else {
+                        url = browser.readUrlFromHeldBook(player);
+                        if (url == null) {
+                            player.sendMessage("§cUsage: /google go <url>");
+                            player.sendMessage("§7Long video links break in chat (256 char limit).");
+                            player.sendMessage("§7Put the full URL in a §fwritten book§7, hold it, then §a/google go");
+                            return true;
+                        }
+                    }
+                    url = browser.normalizeUrl(url);
+                    loadUrl(player, screen.get(), url, truncateLabel(url));
+                } catch (Exception e) {
+                    player.sendMessage("§cBad URL: §7" + e.getMessage());
                 }
-                // Keep it Google-scoped unless they explicitly go elsewhere
-                loadUrl(player, screen.get(), url, url);
             }
             case "refresh", "reload" -> {
                 Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
@@ -175,10 +184,15 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/google home §7— show google.com");
         player.sendMessage("§e/google search <query> §7— search Google");
         player.sendMessage("§e/google go <url> §7— open a URL");
+        player.sendMessage("§7  long links: put URL in a book, hold it, §e/google go");
         player.sendMessage("§e/google refresh §7— reload current page");
         player.sendMessage("§e/google give §7— open switch blocks (lever show/hide)");
         player.sendMessage("§e/google remove §7— remove nearest Google screen");
         player.sendMessage("§8No Chrome needed — works on MineKeep / shared hosts.");
+    }
+
+    private static String truncateLabel(String url) {
+        return url.length() > 48 ? url.substring(0, 45) + "…" : url;
     }
 
     @Override

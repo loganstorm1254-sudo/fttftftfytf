@@ -101,18 +101,75 @@ public final class GoogleBrowser {
      * Capture / render a page to RGB for the map wall.
      */
     public byte[] captureRgb(String url, int outW, int outH) throws IOException, InterruptedException {
+        url = normalizeUrl(url);
         currentUrl = url;
         String lower = url.toLowerCase();
 
-        if (lower.contains("google.com/") && !lower.contains("/search")) {
+        if (lower.contains("google.com/") && !lower.contains("/search") && !looksLikeDirectMedia(lower)) {
             return renderHome(outW, outH);
         }
-        if (lower.contains("google.com/search") || lower.contains("q=")) {
+        if ((lower.contains("google.com/search") || (lower.contains("q=") && lower.contains("google.")))
+                && !looksLikeDirectMedia(lower)) {
             String query = extractQuery(url);
             lastQuery = query;
             return renderSearch(query, outW, outH);
         }
+        if (looksLikeDirectMedia(lower)) {
+            return renderDirectMedia(url, outW, outH);
+        }
         return renderExternalPage(url, outW, outH);
+    }
+
+    public String normalizeUrl(String raw) {
+        if (raw == null) {
+            throw new IllegalArgumentException("Empty URL");
+        }
+        String url = raw.trim()
+                .replace("\n", "")
+                .replace("\r", "")
+                .replace(" ", "");
+        // Strip common chat wrappers
+        if ((url.startsWith("<") && url.endsWith(">")) || (url.startsWith("[") && url.endsWith("]"))) {
+            url = url.substring(1, url.length() - 1);
+        }
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "https://" + url;
+        }
+        url = fixMalformedPercentEncoding(url);
+        // Validate early with a clear error
+        parseUri(url);
+        return url;
+    }
+
+    /** Read a full URL from a held written/writable book (for links longer than chat allows). */
+    public String readUrlFromHeldBook(org.bukkit.entity.Player player) {
+        org.bukkit.inventory.ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand == null || !(hand.getItemMeta() instanceof org.bukkit.inventory.meta.BookMeta book)) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String page : book.getPages()) {
+            sb.append(page);
+        }
+        String text = sb.toString().replace('\n', ' ').replace('\r', ' ').trim();
+        // Prefer the first http(s) URL on the pages
+        Matcher m = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE).matcher(text);
+        if (m.find()) {
+            return m.group().replaceAll("[\\])>,.;]+$", "");
+        }
+        text = text.replace(" ", "");
+        return text.isBlank() ? null : text;
+    }
+
+    private static boolean looksLikeDirectMedia(String lowerUrl) {
+        return lowerUrl.contains(".mp4")
+                || lowerUrl.contains(".webm")
+                || lowerUrl.contains(".mkv")
+                || lowerUrl.contains(".mov")
+                || lowerUrl.contains(".m3u8")
+                || lowerUrl.contains(".mp3")
+                || lowerUrl.contains("cloudfront.net/")
+                || lowerUrl.contains("/file/") && (lowerUrl.contains("archive.org") || lowerUrl.contains("download"));
     }
 
     public byte[] renderOfflineHome(int outW, int outH, String message) {
@@ -278,6 +335,58 @@ public final class GoogleBrowser {
         return scaleToRgb(img, outW, outH);
     }
 
+    /** Direct .mp4 / CloudFront file links — can't play video on maps; show a player card + try screenshot. */
+    private byte[] renderDirectMedia(String url, int outW, int outH) throws IOException, InterruptedException {
+        BufferedImage shot = fetchRemoteScreenshot(url, Math.max(640, Math.min(1280, outW * 2)));
+        if (shot != null) {
+            return composeBrowserView(url, shot, outW, outH, "Video file");
+        }
+
+        BufferedImage img = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        enableNice(g);
+        g.setColor(new Color(15, 15, 15));
+        g.fillRect(0, 0, outW, outH);
+
+        int barH = Math.max(22, outH / 14);
+        g.setColor(new Color(48, 49, 52));
+        g.fillRect(0, 0, outW, barH);
+        g.setColor(new Color(232, 234, 237));
+        g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(9, barH / 2)));
+        g.drawString(truncate(url, g, outW - 24), 12, barH * 2 / 3);
+
+        // Fake player stage
+        int stagePad = Math.max(16, outW / 20);
+        int stageY = barH + stagePad;
+        int stageH = outH - barH - stagePad * 2 - Math.max(36, outH / 10);
+        g.setColor(new Color(30, 30, 30));
+        g.fillRoundRect(stagePad, stageY, outW - stagePad * 2, stageH, 12, 12);
+
+        // Play button
+        int cx = outW / 2;
+        int cy = stageY + stageH / 2;
+        int r = Math.max(28, Math.min(outW, stageH) / 8);
+        g.setColor(new Color(255, 255, 255, 220));
+        g.fillOval(cx - r, cy - r, r * 2, r * 2);
+        g.setColor(new Color(20, 20, 20));
+        int[] xs = {cx - r / 4, cx - r / 4, cx + r / 2};
+        int[] ys = {cy - r / 2, cy + r / 2, cy};
+        g.fillPolygon(xs, ys, 3);
+
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("SansSerif", Font.BOLD, Math.max(14, outH / 18)));
+        String heading = "Video file";
+        int tw = g.getFontMetrics().stringWidth(heading);
+        g.drawString(heading, (outW - tw) / 2, stageY + stageH + Math.max(22, outH / 22));
+
+        g.setColor(new Color(180, 180, 180));
+        g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(10, outH / 28)));
+        String tip = "Maps can't play video — open the archive.org page instead of the .mp4 link";
+        drawWrappedReturn(g, tip, stagePad, stageY + stageH + Math.max(36, outH / 16), outW - stagePad * 2, Math.max(10, outH / 28));
+        g.dispose();
+        return scaleToRgb(img, outW, outH);
+    }
+
     private byte[] composeBrowserView(String url, BufferedImage page, int outW, int outH, String caption) {
         BufferedImage img = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
@@ -322,10 +431,12 @@ public final class GoogleBrowser {
             }
         }
 
+        // Encode the target URL so CloudFront %2F / signed params don't break URI.create
+        String encodedTarget = URLEncoder.encode(pageUrl, StandardCharsets.UTF_8).replace("+", "%20");
         List<String> endpoints = List.of(
-                "https://image.thum.io/get/width/" + width + "/noanimate/" + pageUrl,
-                "https://image.thum.io/get/width/" + width + "/" + pageUrl,
-                "https://s0.wp.com/mshots/v1/" + URLEncoder.encode(pageUrl, StandardCharsets.UTF_8) + "?w=" + width
+                "https://image.thum.io/get/width/" + width + "/noanimate/" + encodedTarget,
+                "https://image.thum.io/get/width/" + width + "/" + encodedTarget,
+                "https://s0.wp.com/mshots/v1/" + encodedTarget + "?w=" + width
         );
 
         for (String endpoint : endpoints) {
@@ -345,7 +456,7 @@ public final class GoogleBrowser {
                 synchronized (shotCache) {
                     shotCache.put(pageUrl, img);
                 }
-                plugin.getLogger().info("Captured page screenshot via " + URI.create(endpoint).getHost()
+                plugin.getLogger().info("Captured page screenshot via " + safeHost(endpoint)
                         + " (" + img.getWidth() + "x" + img.getHeight() + ")");
                 return img;
             } catch (Exception e) {
@@ -388,14 +499,14 @@ public final class GoogleBrowser {
 
     private static String safeHost(String url) {
         try {
-            return URI.create(url).getHost();
+            return parseUri(url).getHost();
         } catch (Exception e) {
             return "remote";
         }
     }
 
     private byte[] fetchBytes(String url) throws IOException, InterruptedException {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+        HttpRequest req = HttpRequest.newBuilder(parseUri(url))
                 .timeout(Duration.ofSeconds(plugin.getConfig().getInt("google.timeout-seconds", 45)))
                 .header("User-Agent", "MineDoom/1.0 (Minecraft plugin; +https://github.com/loganstorm1254-sudo/fttftftfytf)")
                 .header("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
@@ -681,7 +792,7 @@ public final class GoogleBrowser {
     }
 
     private String fetchText(String url, String accept) throws IOException, InterruptedException {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+        HttpRequest req = HttpRequest.newBuilder(parseUri(url))
                 .timeout(Duration.ofSeconds(plugin.getConfig().getInt("google.timeout-seconds", 45)))
                 .header("User-Agent", "MineDoom/1.0 (Minecraft plugin; +https://github.com/loganstorm1254-sudo/fttftftfytf)")
                 .header("Accept", accept)
@@ -699,6 +810,49 @@ public final class GoogleBrowser {
         return fetchText(url, "text/html,application/xhtml+xml");
     }
 
+    /** Lenient URI parse — fixes truncated %XX from Minecraft's 256-char command limit. */
+    static URI parseUri(String raw) {
+        String url = fixMalformedPercentEncoding(raw);
+        try {
+            return URI.create(url);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "Bad URL (often truncated by chat — put the full link in a book and run /google go): "
+                            + shortErr(e.getMessage()),
+                    e);
+        }
+    }
+
+    static String fixMalformedPercentEncoding(String url) {
+        StringBuilder sb = new StringBuilder(url.length() + 8);
+        for (int i = 0; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '%') {
+                if (i + 2 < url.length() && isHex(url.charAt(i + 1)) && isHex(url.charAt(i + 2))) {
+                    sb.append('%').append(url.charAt(i + 1)).append(url.charAt(i + 2));
+                    i += 2;
+                } else {
+                    // Lone/truncated % from a cut-off command → encode as %25
+                    sb.append("%25");
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static boolean isHex(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    }
+
+    private static String shortErr(String msg) {
+        if (msg == null) {
+            return "invalid";
+        }
+        return msg.length() > 80 ? msg.substring(0, 77) + "…" : msg;
+    }
+
     private static String extractQuery(String url) {
         int q = url.indexOf("q=");
         if (q < 0) {
@@ -712,7 +866,7 @@ public final class GoogleBrowser {
         try {
             return java.net.URLDecoder.decode(rest, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            return rest;
+            return fixMalformedPercentEncoding(rest).replace("%25", "%");
         }
     }
 
