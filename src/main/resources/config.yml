@@ -1,0 +1,14 @@
+# MineDoom configuration
+
+# DOOM internal resolution (higher = sharper but heavier)
+doom-width: 320
+doom-height: 200
+
+# How often to push frames to map screens (ticks). 1 = every tick (~20 FPS display)
+render-interval-ticks: 1
+
+# Mouse look sensitivity when converting Minecraft yaw/pitch to DOOM mouse
+mouse-sensitivity: 8.0
+
+# Invert mouse Y (Minecraft pitch)
+invert-mouse-y: false
