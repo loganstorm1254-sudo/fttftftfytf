@@ -5,7 +5,6 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.ItemFrame;
 import org.bukkit.map.MapView;
 
 import java.util.ArrayList;
@@ -13,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A rectangular wall of item-frame maps that displays the DOOM framebuffer.
+ * A rectangular wall of map displays that shows the DOOM framebuffer.
  */
 public final class DoomScreen {
 
@@ -25,7 +24,7 @@ public final class DoomScreen {
     private final int tilesX;
     private final int tilesY;
     private final List<Integer> mapIds;
-    private final List<UUID> frameIds;
+    private final List<UUID> displayIds;
     private transient DoomMapRenderer[] renderers;
 
     public DoomScreen(
@@ -37,7 +36,7 @@ public final class DoomScreen {
             int tilesX,
             int tilesY,
             List<Integer> mapIds,
-            List<UUID> frameIds
+            List<UUID> displayIds
     ) {
         this.id = id;
         this.worldName = worldName;
@@ -51,7 +50,7 @@ public final class DoomScreen {
         this.tilesX = tilesX;
         this.tilesY = tilesY;
         this.mapIds = new ArrayList<>(mapIds);
-        this.frameIds = new ArrayList<>(frameIds);
+        this.displayIds = new ArrayList<>(displayIds);
     }
 
     public UUID getId() {
@@ -86,8 +85,13 @@ public final class DoomScreen {
         return mapIds;
     }
 
+    /** @deprecated use {@link #getDisplayIds()} */
     public List<UUID> getFrameIds() {
-        return frameIds;
+        return displayIds;
+    }
+
+    public List<UUID> getDisplayIds() {
+        return displayIds;
     }
 
     public Location getCenter(org.bukkit.World world) {
@@ -97,7 +101,6 @@ public final class DoomScreen {
     public Location getSeatLocation(org.bukkit.World world) {
         Location center = getCenter(world);
         double dist = 3.0;
-        // Sit on the front side of the screen (same side as facing)
         return switch (facing) {
             case NORTH -> center.clone().add(0, -1, -dist);
             case SOUTH -> center.clone().add(0, -1, dist);
@@ -115,13 +118,16 @@ public final class DoomScreen {
             if (view == null) {
                 continue;
             }
-            view.getRenderers().forEach(view::removeRenderer);
+            for (var r : new ArrayList<>(view.getRenderers())) {
+                view.removeRenderer(r);
+            }
             int tileX = i % tilesX;
             int tileY = i / tilesX;
             DoomMapRenderer renderer = new DoomMapRenderer(this, tileX, tileY, colorCache);
             view.addRenderer(renderer);
             view.setTrackingPosition(false);
             view.setUnlimitedTracking(false);
+            view.setLocked(true);
             renderers[i] = renderer;
         }
     }
@@ -137,12 +143,19 @@ public final class DoomScreen {
         }
     }
 
-    public void removeFrames(org.bukkit.World world) {
-        for (UUID frameId : frameIds) {
-            Entity e = world.getEntity(frameId);
-            if (e instanceof ItemFrame frame) {
-                frame.setItem(null);
-                frame.remove();
+    public void removeDisplays(org.bukkit.World world) {
+        for (UUID displayId : displayIds) {
+            Entity e = world.getEntity(displayId);
+            if (e != null) {
+                e.remove();
+            }
+        }
+        // Also sweep tagged leftovers in the region
+        Location c = getCenter(world);
+        double radius = Math.max(tilesX, tilesY) + 2;
+        for (Entity e : world.getNearbyEntities(c, radius, radius, radius)) {
+            if (e.getScoreboardTags().contains("minedoom_screen")) {
+                e.remove();
             }
         }
     }
@@ -160,18 +173,23 @@ public final class DoomScreen {
         section.set("tilesX", tilesX);
         section.set("tilesY", tilesY);
         section.set("mapIds", mapIds);
-        List<String> frames = new ArrayList<>();
-        for (UUID u : frameIds) {
-            frames.add(u.toString());
+        List<String> ids = new ArrayList<>();
+        for (UUID u : displayIds) {
+            ids.add(u.toString());
         }
-        section.set("frameIds", frames);
+        section.set("displayIds", ids);
+        section.set("frameIds", ids); // back-compat
     }
 
     public static DoomScreen read(ConfigurationSection section) {
         List<Integer> maps = section.getIntegerList("mapIds");
-        List<UUID> frames = new ArrayList<>();
-        for (String s : section.getStringList("frameIds")) {
-            frames.add(UUID.fromString(s));
+        List<UUID> displays = new ArrayList<>();
+        List<String> raw = section.getStringList("displayIds");
+        if (raw.isEmpty()) {
+            raw = section.getStringList("frameIds");
+        }
+        for (String s : raw) {
+            displays.add(UUID.fromString(s));
         }
         return new DoomScreen(
                 UUID.fromString(section.getString("id")),
@@ -186,7 +204,7 @@ public final class DoomScreen {
                 section.getInt("tilesX"),
                 section.getInt("tilesY"),
                 maps,
-                frames
+                displays
         );
     }
 

@@ -1,75 +1,72 @@
 package com.minedoom.screen;
 
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.ItemFrame;
+import org.bukkit.entity.Display;
+import org.bukkit.entity.ItemDisplay;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.Transformation;
+import org.joml.AxisAngle4f;
+import org.joml.Vector3f;
 
 /**
- * Spawns item frames in the air cell on a wall face (never inside the solid block).
+ * Places a filled map as a flat {@link ItemDisplay} on a wall face.
+ * <p>
+ * ItemFrames were unreliable: Bukkit's hanging spawner attaches to neighboring
+ * wall blocks and adjacent frames collide, leaving a single tile.
  */
 public final class FramePlacer {
 
     private FramePlacer() {}
 
-    /**
-     * @param wallBlock solid wall tile from the selection
-     * @param outward   direction from the wall toward the viewer (= item frame facing)
-     */
-    public static ItemFrame spawnOnWallFace(World world, Block wallBlock, BlockFace outward) {
+    public static ItemDisplay spawnMapDisplay(World world, Block wallBlock, BlockFace outward, ItemStack mapItem) {
         if (outward != BlockFace.NORTH && outward != BlockFace.SOUTH
                 && outward != BlockFace.EAST && outward != BlockFace.WEST) {
             throw new IllegalStateException("Facing must be NORTH/SOUTH/EAST/WEST, got " + outward);
         }
 
-        Block air = wallBlock.getRelative(outward);
-        if (air.getType().isSolid()) {
-            throw new IllegalStateException(
-                    "No air on the " + outward + " side of "
-                            + wallBlock.getX() + "," + wallBlock.getY() + "," + wallBlock.getZ()
-                            + " (found " + air.getType() + "). Stand on the open side of the wall.");
-        }
-        if (!air.getType().isAir()) {
-            air.setType(Material.AIR);
-        }
+        Location loc = wallBlock.getLocation().add(0.5, 0.5, 0.5);
+        loc.add(outward.getDirection().multiply(0.51));
+        loc.setDirection(outward.getDirection());
 
-        Location center = air.getLocation().add(0.5, 0.5, 0.5);
-        for (Entity e : world.getNearbyEntities(center, 0.51, 0.51, 0.51)) {
-            if (e instanceof ItemFrame) {
+        world.getNearbyEntities(loc, 0.45, 0.45, 0.45).forEach(e -> {
+            if (e instanceof ItemDisplay || e instanceof org.bukkit.entity.ItemFrame) {
                 e.remove();
             }
+        });
+
+        // Tip the flat map item upright (item model lies flat by default), then entity yaw faces outward
+        AxisAngle4f tipUp = new AxisAngle4f((float) (-Math.PI / 2.0), 1f, 0f, 0f);
+        Transformation transform = new Transformation(
+                new Vector3f(0f, 0f, 0f),
+                tipUp,
+                new Vector3f(1.0f, 1.0f, 1.0f),
+                new AxisAngle4f(0f, 0f, 0f, 1f)
+        );
+
+        ItemDisplay display = world.spawn(loc, ItemDisplay.class, d -> {
+            d.setItemStack(mapItem.clone());
+            d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+            d.setBillboard(Display.Billboard.FIXED);
+            d.setTransformation(transform);
+            d.setBrightness(new Display.Brightness(15, 15));
+            d.setShadowRadius(0f);
+            d.setShadowStrength(0f);
+            d.setDisplayWidth(1.0f);
+            d.setDisplayHeight(1.0f);
+            d.setTeleportDuration(0);
+            d.setInterpolationDuration(0);
+            d.setPersistent(true);
+            d.setInvulnerable(true);
+            d.addScoreboardTag("minedoom_screen");
+        });
+
+        if (!display.isValid()) {
+            throw new IllegalStateException("Failed to spawn map display on "
+                    + wallBlock.getX() + "," + wallBlock.getY() + "," + wallBlock.getZ());
         }
-
-        Location spawnLoc = air.getLocation();
-        ItemFrame frame = world.spawn(spawnLoc, ItemFrame.class);
-        boolean attached = frame.setFacingDirection(outward, true);
-        frame.setVisible(true);
-        frame.setFixed(true);
-        frame.setInvulnerable(true);
-        frame.setSilent(true);
-        frame.setGravity(false);
-
-        if (!attached) {
-            // Retry once with force already true — if still wrong facing, fail clearly
-            frame.setFacingDirection(outward, true);
-        }
-
-        if (!frame.isValid()) {
-            throw new IllegalStateException("Item frame failed to stay at "
-                    + air.getX() + "," + air.getY() + "," + air.getZ()
-                    + " facing " + outward);
-        }
-
-        if (frame.getFacing() != outward) {
-            frame.remove();
-            throw new IllegalStateException("Item frame facing became " + frame.getFacing()
-                    + " instead of " + outward + " at "
-                    + air.getX() + "," + air.getY() + "," + air.getZ());
-        }
-
-        return frame;
+        return display;
     }
 }
