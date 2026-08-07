@@ -23,7 +23,7 @@ public final class WandListener implements Listener {
         this.selection = selection;
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onWand(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;

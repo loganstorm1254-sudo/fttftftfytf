@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.ItemFrame;
@@ -52,7 +53,7 @@ public final class ScreenManager {
         DoomScreen best = null;
         double bestDist = maxDist * maxDist;
         for (DoomScreen screen : screens.values()) {
-            if (!screen.getWorldName().equals(loc.getWorld().getName())) {
+            if (loc.getWorld() == null || !screen.getWorldName().equals(loc.getWorld().getName())) {
                 continue;
             }
             Location c = screen.getCenter(loc.getWorld());
@@ -88,7 +89,6 @@ public final class ScreenManager {
             throw new IllegalStateException("Floor/ceiling selections are not supported — select a vertical wall.");
         }
 
-        // Place on the side the player is standing on
         BlockFace facing = resolveFacingFromPlayerPosition(player, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ);
         int tilesX;
         int tilesY = sizeY;
@@ -107,6 +107,44 @@ public final class ScreenManager {
             throw new IllegalStateException("Screen too large (max 64 maps). Try a smaller selection, e.g. 3x2.");
         }
 
+        return buildScreen(player, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tilesX, tilesY);
+    }
+
+    /**
+     * Place a 1×1 screen on the wall face the player is looking at.
+     */
+    public DoomScreen placeOnTargetBlock(Player player) throws Exception {
+        var hit = player.rayTraceBlocks(8);
+        if (hit == null || hit.getHitBlock() == null || hit.getHitBlockFace() == null) {
+            throw new IllegalStateException("Look at a solid wall within 8 blocks, then /doom here");
+        }
+        Block wall = hit.getHitBlock();
+        BlockFace face = hit.getHitBlockFace();
+        if (face != BlockFace.NORTH && face != BlockFace.SOUTH
+                && face != BlockFace.EAST && face != BlockFace.WEST) {
+            throw new IllegalStateException("Look at a vertical wall face (not floor/ceiling).");
+        }
+        if (!wall.getType().isSolid()) {
+            throw new IllegalStateException("Target block is not solid.");
+        }
+        return buildScreen(
+                player,
+                wall.getX(), wall.getY(), wall.getZ(),
+                wall.getX(), wall.getY(), wall.getZ(),
+                1, 1,
+                face,
+                1, 1
+        );
+    }
+
+    private DoomScreen buildScreen(
+            Player player,
+            int minX, int minY, int minZ,
+            int maxX, int maxY, int maxZ,
+            int sizeX, int sizeZ,
+            BlockFace facing,
+            int tilesX, int tilesY
+    ) throws Exception {
         plugin.getEngine().ensureStarted();
 
         World world = player.getWorld();
@@ -115,37 +153,24 @@ public final class ScreenManager {
 
         for (int ty = 0; ty < tilesY; ty++) {
             for (int tx = 0; tx < tilesX; tx++) {
-                Location wallBlock = tileLocation(world, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tx, ty);
-
-                // Item frames attach TO the wall block and hang on the `facing` side
-                // (Bukkit setFacingDirection moves the entity onto that face)
-                Location attachAt = wallBlock.getBlock().getLocation();
-
-                attachAt.getWorld().getNearbyEntities(attachAt.clone().add(0.5, 0.5, 0.5), 0.75, 0.75, 0.75)
-                        .stream()
-                        .filter(e -> e instanceof ItemFrame)
-                        .forEach(org.bukkit.entity.Entity::remove);
-
-                ItemFrame frame = world.spawn(attachAt, org.bukkit.entity.GlowItemFrame.class, f -> {
-                    f.setFacingDirection(facing, true);
-                    f.setVisible(true);
-                    f.setFixed(true);
-                    f.setInvulnerable(true);
-                    f.setSilent(true);
-                    f.setGravity(false);
-                });
-
-                if (!frame.isValid()) {
-                    throw new IllegalStateException("Failed to spawn item frame on wall at "
-                            + attachAt.getBlockX() + "," + attachAt.getBlockY() + "," + attachAt.getBlockZ()
-                            + " facing " + facing);
+                Location wallLoc = tileLocation(world, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tx, ty);
+                Block wallBlock = wallLoc.getBlock();
+                if (!wallBlock.getType().isSolid()) {
+                    throw new IllegalStateException("Selection block at "
+                            + wallBlock.getX() + "," + wallBlock.getY() + "," + wallBlock.getZ()
+                            + " is not solid (" + wallBlock.getType() + "). Select solid wall blocks.");
                 }
+
+                // Spawn in AIR on the player's side — never inside the wall
+                ItemFrame frame = FramePlacer.spawnOnWallFace(world, wallBlock, facing);
 
                 MapView view = Bukkit.createMap(world);
                 view.setTrackingPosition(false);
                 view.setUnlimitedTracking(false);
                 view.setLocked(true);
-                view.getRenderers().clear();
+                for (var r : new ArrayList<>(view.getRenderers())) {
+                    view.removeRenderer(r);
+                }
 
                 ItemStack mapItem = new ItemStack(Material.FILLED_MAP);
                 MapMeta meta = (MapMeta) mapItem.getItemMeta();
@@ -157,6 +182,10 @@ public final class ScreenManager {
 
                 mapIds.add(view.getId());
                 frameIds.add(frame.getUniqueId());
+
+                plugin.getLogger().info("Frame at " + frame.getLocation().getBlockX() + ","
+                        + frame.getLocation().getBlockY() + "," + frame.getLocation().getBlockZ()
+                        + " facing=" + frame.getFacing() + " (wanted " + facing + ")");
             }
         }
 
@@ -177,9 +206,9 @@ public final class ScreenManager {
 
         byte[] placeholder = new byte[plugin.getEngine().getWidth() * plugin.getEngine().getHeight() * 3];
         for (int i = 0; i < placeholder.length; i += 3) {
-            placeholder[i] = 20;
-            placeholder[i + 1] = 20;
-            placeholder[i + 2] = 24;
+            placeholder[i] = 40;
+            placeholder[i + 1] = 40;
+            placeholder[i + 2] = 48;
         }
         screen.pushFrame(placeholder, plugin.getEngine().getWidth(), plugin.getEngine().getHeight());
 
@@ -224,9 +253,6 @@ public final class ScreenManager {
         return new Location(world, x, y, z);
     }
 
-    /**
-     * Pick the wall face closest to the player (the side they are standing on).
-     */
     private static BlockFace resolveFacingFromPlayerPosition(
             Player player,
             int minX, int minY, int minZ,
@@ -235,20 +261,17 @@ public final class ScreenManager {
             int sizeZ
     ) {
         double cx = (minX + maxX) / 2.0 + 0.5;
-        double cy = (minY + maxY) / 2.0 + 0.5;
         double cz = (minZ + maxZ) / 2.0 + 0.5;
         Location eye = player.getEyeLocation();
         double dx = eye.getX() - cx;
         double dz = eye.getZ() - cz;
 
         if (sizeZ == 1) {
-            // Thin in Z — choose north vs south by where the player stands
             return dz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
         }
         if (sizeX == 1) {
             return dx >= 0 ? BlockFace.EAST : BlockFace.WEST;
         }
-        // Fallback: largest horizontal offset
         if (Math.abs(dz) >= Math.abs(dx)) {
             return dz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
         }

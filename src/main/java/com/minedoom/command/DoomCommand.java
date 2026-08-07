@@ -64,8 +64,19 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
                     DoomScreen screen = screens.placeFromSelection(player);
                     engine.ensureStarted();
                     player.sendMessage("§aDoom screen placed §7(" + screen.getTilesX() + "x" + screen.getTilesY()
-                            + " maps, face §f" + screen.getFacing() + "§7)");
-                    player.sendMessage("§7Stand on that side of the wall and run §a/doom play");
+                            + " · face §f" + screen.getFacing() + "§7)");
+                    player.sendMessage("§7If you don't see it, stand on the other side and /doom place again, or try §a/doom here");
+                } catch (Exception e) {
+                    player.sendMessage("§c" + e.getMessage());
+                }
+            }
+            case "here" -> {
+                try {
+                    DoomScreen screen = screens.placeOnTargetBlock(player);
+                    engine.ensureStarted();
+                    player.sendMessage("§a1×1 Doom screen on the block you're looking at §7(face §f"
+                            + screen.getFacing() + "§7)");
+                    player.sendMessage("§7Run §a/doom play §7to sit and play");
                 } catch (Exception e) {
                     player.sendMessage("§c" + e.getMessage());
                 }
@@ -128,20 +139,21 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(Player player) {
         player.sendMessage("§c§lMineDoom §8— DOOM in Minecraft");
-        player.sendMessage("§e/doom wand §7— get WorldEdit axe");
-        player.sendMessage("§e/doom place §7— turn WE selection into a Doom screen");
+        player.sendMessage("§e/doom wand §7— wooden axe to select a wall");
+        player.sendMessage("§e/doom place §7— turn selection into a Doom screen");
+        player.sendMessage("§e/doom here §7— place 1×1 screen on the face you look at");
         player.sendMessage("§e/doom play §7— sit down and play with keyboard & mouse");
         player.sendMessage("§e/doom stop §7— exit play mode");
         player.sendMessage("§e/doom remove §7— remove nearest screen");
         player.sendMessage("§e/doom enter §7— press Enter (menus)");
         player.sendMessage("§e/doom esc §7— press Escape");
-        player.sendMessage("§8Controls: WASD · mouse look · LMB fire · RMB use · Shift run · hotbar weapons");
+        player.sendMessage("§8Controls: WASD · mouse look · LMB fire · RMB use · Sprint run · hotbar weapons");
     }
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            List<String> opts = Arrays.asList("wand", "place", "play", "stop", "remove", "enter", "esc", "status", "help");
+            List<String> opts = Arrays.asList("wand", "place", "here", "play", "stop", "remove", "enter", "esc", "status", "help");
             String p = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();
             for (String o : opts) {
