@@ -17,19 +17,19 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Renders Google pages onto map screens without Chrome — HTTP fetch + AWT paint.
- * Works on shared hosts (MineKeep, etc.) that cannot install Chromium.
+ * Renders a Google-styled UI on map screens without Chrome.
+ * Search uses public JSON APIs (DuckDuckGo + Wikipedia) because Google HTML
+ * blocks shared hosts like MineKeep after ~1 request.
  */
 public final class GoogleBrowser {
 
-    private static final Pattern RESULT_BLOCK = Pattern.compile(
-            "<a[^>]*href=\"(/url\\?q=([^\"&]+)[^\"]*|https?://[^\"]+)\"[^>]*>(.*?)</a>",
-            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern TITLE_TAG = Pattern.compile(
             "<title[^>]*>(.*?)</title>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern META_DESC = Pattern.compile(
@@ -37,11 +37,27 @@ public final class GoogleBrowser {
             Pattern.CASE_INSENSITIVE);
     private static final Pattern STRIP_TAGS = Pattern.compile("<[^>]+>");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern DDG_TOPIC = Pattern.compile(
+            "\"(?:Text|Result)\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"[\\s\\S]*?\"FirstURL\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern DDG_ABSTRACT = Pattern.compile(
+            "\"Abstract(?:Text)?\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+    private static final Pattern DDG_ABSTRACT_URL = Pattern.compile(
+            "\"AbstractURL\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+    private static final Pattern DDG_HEADING = Pattern.compile(
+            "\"Heading\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
 
     private final JavaPlugin plugin;
     private final HttpClient http;
+    private final Map<String, List<SearchResult>> cache = new LinkedHashMap<>(32, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, List<SearchResult>> eldest) {
+            return size() > 32;
+        }
+    };
     private volatile String currentUrl = "https://www.google.com/";
     private volatile String lastQuery = "";
+    private volatile String lastError = "";
 
     public GoogleBrowser(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -127,7 +143,7 @@ public final class GoogleBrowser {
         return scaleToRgb(img, outW, outH);
     }
 
-    private byte[] renderSearch(String query, int outW, int outH) throws IOException, InterruptedException {
+    private byte[] renderSearch(String query, int outW, int outH) {
         List<SearchResult> results = fetchGoogleResults(query);
         BufferedImage img = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
@@ -164,8 +180,9 @@ public final class GoogleBrowser {
         if (results.isEmpty()) {
             g.setColor(new Color(95, 99, 104));
             g.setFont(new Font("SansSerif", Font.PLAIN, bodySize));
-            g.drawString("No results (network blocked or Google challenged the request).", 16, y);
-            g.drawString("Try again, or use /google home", 16, y + bodySize + 4);
+            String err = lastError.isBlank() ? "No results for this query." : lastError;
+            y = drawWrappedReturn(g, err, 16, y, outW - 32, bodySize);
+            g.drawString("Try another query — /google search <words>", 16, y + 8);
         } else {
             for (SearchResult r : results) {
                 if (y > outH - gap) {
@@ -244,107 +261,269 @@ public final class GoogleBrowser {
         return scaleToRgb(img, outW, outH);
     }
 
-    private List<SearchResult> fetchGoogleResults(String query) throws IOException, InterruptedException {
-        String url = searchUrl(query);
-        String html;
-        try {
-            html = fetchHtml(url);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Google fetch failed: " + e.getMessage());
-            return List.of();
+    private List<SearchResult> fetchGoogleResults(String query) {
+        String key = query.trim().toLowerCase();
+        synchronized (cache) {
+            List<SearchResult> cached = cache.get(key);
+            if (cached != null && !cached.isEmpty()) {
+                lastError = "";
+                return cached;
+            }
         }
 
         List<SearchResult> results = new ArrayList<>();
-        Matcher m = RESULT_BLOCK.matcher(html);
-        while (m.find() && results.size() < 8) {
-            String href = m.group(2) != null ? m.group(2) : m.group(1);
-            String titleHtml = m.group(3);
-            if (href == null) {
-                continue;
-            }
-            href = href.replace("&amp;", "&");
-            if (href.startsWith("/url?q=")) {
-                int amp = href.indexOf('&');
-                href = amp > 0 ? href.substring(7, amp) : href.substring(7);
-            }
+        List<String> errors = new ArrayList<>();
+
+        // 1) DuckDuckGo Instant Answer API — works on shared hosts (no Google scrape)
+        try {
+            results.addAll(fetchDdgApi(query));
+        } catch (Exception e) {
+            errors.add("DDG API: " + e.getMessage());
+            plugin.getLogger().warning("DDG API search failed: " + e.getMessage());
+        }
+
+        // 2) Wikipedia OpenSearch — very reliable JSON API
+        if (results.size() < 6) {
             try {
-                href = java.net.URLDecoder.decode(href, StandardCharsets.UTF_8);
-            } catch (Exception ignored) {
+                results.addAll(fetchWikipedia(query));
+            } catch (Exception e) {
+                errors.add("Wiki: " + e.getMessage());
+                plugin.getLogger().warning("Wikipedia search failed: " + e.getMessage());
             }
-            if (!href.startsWith("http")) {
+        }
+
+        // 3) DuckDuckGo HTML scrape as last resort
+        if (results.isEmpty()) {
+            try {
+                results.addAll(fetchDdgHtml(query));
+            } catch (Exception e) {
+                errors.add("DDG HTML: " + e.getMessage());
+                plugin.getLogger().warning("DDG HTML search failed: " + e.getMessage());
+            }
+        }
+
+        results = dedupe(results);
+        if (results.isEmpty()) {
+            lastError = errors.isEmpty()
+                    ? "No results (server outbound HTTP may be blocked)."
+                    : "Search failed: " + String.join(" · ", errors);
+        } else {
+            lastError = "";
+            synchronized (cache) {
+                cache.put(key, List.copyOf(results));
+            }
+        }
+        return results;
+    }
+
+    private List<SearchResult> fetchDdgApi(String query) throws IOException, InterruptedException {
+        String url = "https://api.duckduckgo.com/?q="
+                + URLEncoder.encode(query, StandardCharsets.UTF_8)
+                + "&format=json&no_html=1&skip_disambig=1";
+        String json = fetchText(url, "application/json");
+        List<SearchResult> results = new ArrayList<>();
+
+        String heading = unescapeJson(firstMatch(DDG_HEADING, json, ""));
+        String abs = unescapeJson(firstMatch(DDG_ABSTRACT, json, ""));
+        String absUrl = unescapeJson(firstMatch(DDG_ABSTRACT_URL, json, ""));
+        if (!abs.isBlank() && absUrl.startsWith("http")) {
+            results.add(new SearchResult(
+                    heading.isBlank() ? truncatePlain(abs, 80) : heading,
+                    absUrl,
+                    abs));
+        }
+
+        Matcher m = DDG_TOPIC.matcher(json);
+        while (m.find() && results.size() < 8) {
+            String text = unescapeJson(m.group(1));
+            String link = unescapeJson(m.group(2));
+            if (!link.startsWith("http") || text.isBlank()) {
                 continue;
             }
-            if (href.contains("google.com/") && !href.contains("/url")) {
+            String title = text;
+            String snippet = "";
+            int dash = text.indexOf(" - ");
+            if (dash > 0) {
+                title = text.substring(0, dash).trim();
+                snippet = text.substring(dash + 3).trim();
+            }
+            results.add(new SearchResult(title, link, snippet));
+        }
+        return results;
+    }
+
+    private List<SearchResult> fetchWikipedia(String query) throws IOException, InterruptedException {
+        String url = "https://en.wikipedia.org/w/api.php?action=opensearch&limit=8&namespace=0&format=json&search="
+                + URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String json = fetchText(url, "application/json");
+        List<SearchResult> results = new ArrayList<>();
+
+        // OpenSearch JSON: [query, [titles], [descs], [urls]]
+        List<String> titles = parseJsonStringArray(json, 1);
+        List<String> descs = parseJsonStringArray(json, 2);
+        List<String> urls = parseJsonStringArray(json, 3);
+        int n = Math.min(titles.size(), urls.size());
+        for (int i = 0; i < n && results.size() < 8; i++) {
+            String title = titles.get(i);
+            String link = urls.get(i);
+            String snippet = i < descs.size() ? descs.get(i) : "";
+            if (title.isBlank() || !link.startsWith("http")) {
                 continue;
             }
-            String title = cleanText(titleHtml);
-            if (title.length() < 3 || title.equalsIgnoreCase("cached") || title.equalsIgnoreCase("similar")) {
-                continue;
+            results.add(new SearchResult(title, link, snippet));
+        }
+        return results;
+    }
+
+    private List<SearchResult> fetchDdgHtml(String query) throws IOException, InterruptedException {
+        List<SearchResult> results = new ArrayList<>();
+        String url = "https://html.duckduckgo.com/html/?q="
+                + URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String html = fetchText(url, "text/html,application/xhtml+xml");
+        Pattern p = Pattern.compile(
+                "class=\"result__a\"[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+        Pattern snip = Pattern.compile(
+                "class=\"result__snippet\"[^>]*>(.*?)</(?:a|td|div)",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+        Matcher m = p.matcher(html);
+        Matcher s = snip.matcher(html);
+        while (m.find() && results.size() < 8) {
+            String href = m.group(1).replace("&amp;", "&");
+            int uddg = href.indexOf("uddg=");
+            if (uddg >= 0) {
+                String enc = href.substring(uddg + 5);
+                int amp = enc.indexOf('&');
+                if (amp > 0) enc = enc.substring(0, amp);
+                href = java.net.URLDecoder.decode(enc, StandardCharsets.UTF_8);
             }
+            String title = cleanText(m.group(2));
+            String snippet = "";
+            if (s.find()) {
+                snippet = cleanText(s.group(1));
+            }
+            if (title.length() > 2 && href.startsWith("http")) {
+                results.add(new SearchResult(title, href, snippet));
+            }
+        }
+        return results;
+    }
+
+    private static List<SearchResult> dedupe(List<SearchResult> in) {
+        List<SearchResult> out = new ArrayList<>();
+        for (SearchResult r : in) {
             boolean dup = false;
-            for (SearchResult existing : results) {
-                if (existing.url.equals(href) || existing.title.equals(title)) {
+            for (SearchResult e : out) {
+                if (e.url.equalsIgnoreCase(r.url) || e.title.equalsIgnoreCase(r.title)) {
                     dup = true;
                     break;
                 }
             }
-            if (dup) {
+            if (!dup) {
+                out.add(r);
+            }
+            if (out.size() >= 8) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    /** Pull the Nth top-level JSON array of strings from an OpenSearch-style payload. */
+    private static List<String> parseJsonStringArray(String json, int arrayIndex) {
+        List<String> arrays = new ArrayList<>();
+        int depth = 0;
+        int start = -1;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (inString) {
+                if (escape) {
+                    escape = false;
+                } else if (c == '\\') {
+                    escape = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
                 continue;
             }
-            results.add(new SearchResult(title, href, ""));
-        }
-
-        // Fallback: DuckDuckGo HTML if Google returned nothing useful
-        if (results.isEmpty()) {
-            results.addAll(fetchDdgResults(query));
-        }
-        return results;
-    }
-
-    private List<SearchResult> fetchDdgResults(String query) {
-        List<SearchResult> results = new ArrayList<>();
-        try {
-            String url = "https://html.duckduckgo.com/html/?q="
-                    + URLEncoder.encode(query, StandardCharsets.UTF_8);
-            String html = fetchHtml(url);
-            Pattern p = Pattern.compile(
-                    "class=\"result__a\"[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
-                    Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-            Pattern snip = Pattern.compile(
-                    "class=\"result__snippet\"[^>]*>(.*?)</(?:a|td|div)",
-                    Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-            Matcher m = p.matcher(html);
-            Matcher s = snip.matcher(html);
-            while (m.find() && results.size() < 8) {
-                String href = m.group(1).replace("&amp;", "&");
-                // DDG wraps redirects
-                int uddg = href.indexOf("uddg=");
-                if (uddg >= 0) {
-                    String enc = href.substring(uddg + 5);
-                    int amp = enc.indexOf('&');
-                    if (amp > 0) enc = enc.substring(0, amp);
-                    href = java.net.URLDecoder.decode(enc, StandardCharsets.UTF_8);
+            if (c == '"') {
+                inString = true;
+                continue;
+            }
+            if (c == '[') {
+                if (depth == 1) {
+                    start = i;
                 }
-                String title = cleanText(m.group(2));
-                String snippet = "";
-                if (s.find()) {
-                    snippet = cleanText(s.group(1));
-                }
-                if (title.length() > 2 && href.startsWith("http")) {
-                    results.add(new SearchResult(title, href, snippet));
+                depth++;
+            } else if (c == ']') {
+                depth--;
+                if (depth == 1 && start >= 0) {
+                    arrays.add(json.substring(start, i + 1));
+                    start = -1;
                 }
             }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Search fallback failed: " + e.getMessage());
         }
-        return results;
+        if (arrayIndex >= arrays.size()) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        Matcher m = Pattern.compile("\"((?:\\\\.|[^\"\\\\])*)\"").matcher(arrays.get(arrayIndex));
+        while (m.find()) {
+            values.add(unescapeJson(m.group(1)));
+        }
+        return values;
     }
 
-    private String fetchHtml(String url) throws IOException, InterruptedException {
+    private static String unescapeJson(String s) {
+        if (s == null || s.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                char n = s.charAt(++i);
+                switch (n) {
+                    case 'n' -> out.append('\n');
+                    case 't' -> out.append('\t');
+                    case 'r' -> out.append('\r');
+                    case '"' -> out.append('"');
+                    case '\\' -> out.append('\\');
+                    case 'u' -> {
+                        if (i + 4 < s.length()) {
+                            try {
+                                out.append((char) Integer.parseInt(s.substring(i + 1, i + 5), 16));
+                                i += 4;
+                            } catch (NumberFormatException e) {
+                                out.append('u');
+                            }
+                        } else {
+                            out.append('u');
+                        }
+                    }
+                    default -> out.append(n);
+                }
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    private static String truncatePlain(String text, int max) {
+        if (text.length() <= max) {
+            return text;
+        }
+        return text.substring(0, max - 1) + "…";
+    }
+
+    private String fetchText(String url, String accept) throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(plugin.getConfig().getInt("google.timeout-seconds", 45)))
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-                .header("Accept", "text/html,application/xhtml+xml")
+                .header("User-Agent", "MineDoom/1.0 (Minecraft plugin; +https://github.com/loganstorm1254-sudo/fttftftfytf)")
+                .header("Accept", accept)
                 .header("Accept-Language", "en-US,en;q=0.9")
                 .GET()
                 .build();
@@ -353,6 +532,10 @@ public final class GoogleBrowser {
             throw new IOException("HTTP " + res.statusCode() + " for " + url);
         }
         return res.body();
+    }
+
+    private String fetchHtml(String url) throws IOException, InterruptedException {
+        return fetchText(url, "text/html,application/xhtml+xml");
     }
 
     private static String extractQuery(String url) {
