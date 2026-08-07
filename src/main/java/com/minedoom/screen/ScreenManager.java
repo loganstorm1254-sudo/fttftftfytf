@@ -1,13 +1,6 @@
 package com.minedoom.screen;
 
 import com.minedoom.MineDoomPlugin;
-import com.sk89q.worldedit.IncompleteRegionException;
-import com.sk89q.worldedit.LocalSession;
-import com.sk89q.worldedit.WorldEdit;
-import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldedit.regions.Region;
-import com.sk89q.worldedit.session.SessionManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -33,13 +26,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ScreenManager {
 
     private final MineDoomPlugin plugin;
+    private final SelectionService selectionService;
     private final MapColorCache colorCache = new MapColorCache();
     private final ConcurrentHashMap<UUID, DoomScreen> screens = new ConcurrentHashMap<>();
     private final File storeFile;
 
-    public ScreenManager(MineDoomPlugin plugin) {
+    public ScreenManager(MineDoomPlugin plugin, SelectionService selectionService) {
         this.plugin = plugin;
+        this.selectionService = selectionService;
         this.storeFile = new File(plugin.getDataFolder(), "screens.yml");
+    }
+
+    public SelectionService getSelectionService() {
+        return selectionService;
     }
 
     public Collection<DoomScreen> getScreens() {
@@ -67,27 +66,18 @@ public final class ScreenManager {
         return Optional.ofNullable(best);
     }
 
-    public DoomScreen placeFromWorldEdit(Player player) throws Exception {
-        if (Bukkit.getPluginManager().getPlugin("WorldEdit") == null) {
-            throw new IllegalStateException("WorldEdit is required. Install WorldEdit, use //wand, select two corners of a flat wall, then /doom place");
-        }
+    public DoomScreen placeFromSelection(Player player) throws Exception {
+        SelectionService.Bounds bounds = selectionService.requireBounds(player);
+        int minX = bounds.minX();
+        int minY = bounds.minY();
+        int minZ = bounds.minZ();
+        int maxX = bounds.maxX();
+        int maxY = bounds.maxY();
+        int maxZ = bounds.maxZ();
+        int sizeX = bounds.sizeX();
+        int sizeY = bounds.sizeY();
+        int sizeZ = bounds.sizeZ();
 
-        SessionManager manager = WorldEdit.getInstance().getSessionManager();
-        LocalSession session = manager.get(BukkitAdapter.adapt(player));
-        Region region;
-        try {
-            region = session.getSelection(session.getSelectionWorld());
-        } catch (IncompleteRegionException e) {
-            throw new IllegalStateException("Make a WorldEdit selection first (//wand left + right click).");
-        }
-
-        BlockVector3 min = region.getMinimumPoint();
-        BlockVector3 max = region.getMaximumPoint();
-        int sizeX = max.x() - min.x() + 1;
-        int sizeY = max.y() - min.y() + 1;
-        int sizeZ = max.z() - min.z() + 1;
-
-        // Selection must be a flat wall (exactly one axis thickness = 1)
         int thinAxes = 0;
         if (sizeX == 1) thinAxes++;
         if (sizeY == 1) thinAxes++;
@@ -107,7 +97,6 @@ public final class ScreenManager {
         } else if (sizeX == 1) {
             tilesX = sizeZ;
         } else {
-            // corner pillar — use the larger horizontal span
             tilesX = Math.max(sizeX, sizeZ);
         }
 
@@ -124,8 +113,7 @@ public final class ScreenManager {
 
         for (int ty = 0; ty < tilesY; ty++) {
             for (int tx = 0; tx < tilesX; tx++) {
-                Location blockLoc = tileLocation(world, min, max, sizeX, sizeZ, facing, tx, ty, tilesY);
-                // Item frames live in the air block in front of the wall, facing the player
+                Location blockLoc = tileLocation(world, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tx, ty);
                 Location frameLoc = blockLoc.clone().add(facing.getModX(), facing.getModY(), facing.getModZ());
                 frameLoc.add(0.5, 0.5, 0.5);
                 ItemFrame frame = world.spawn(frameLoc, ItemFrame.class, f -> {
@@ -156,8 +144,8 @@ public final class ScreenManager {
         DoomScreen screen = new DoomScreen(
                 UUID.randomUUID(),
                 world.getName(),
-                min.x(), min.y(), min.z(),
-                max.x(), max.y(), max.z(),
+                minX, minY, minZ,
+                maxX, maxY, maxZ,
                 facing,
                 tilesX,
                 tilesY,
@@ -168,7 +156,6 @@ public final class ScreenManager {
         screens.put(screen.getId(), screen);
         save();
 
-        // Kick a black frame so maps aren't empty
         byte[] black = new byte[plugin.getEngine().getWidth() * plugin.getEngine().getHeight() * 3];
         screen.pushFrame(black, plugin.getEngine().getWidth(), plugin.getEngine().getHeight());
 
@@ -177,30 +164,28 @@ public final class ScreenManager {
 
     private static Location tileLocation(
             World world,
-            BlockVector3 min,
-            BlockVector3 max,
+            int minX, int minY, int minZ,
+            int maxX, int maxY, int maxZ,
             int sizeX,
             int sizeZ,
             BlockFace facing,
             int tx,
-            int ty,
-            int tilesY
+            int ty
     ) {
-        int y = max.y() - ty; // top row first in map index 0
+        int y = maxY - ty;
         int x;
         int z;
         if (sizeZ == 1) {
-            // Wall on X/Y plane
             boolean flipX = facing == BlockFace.NORTH;
-            x = flipX ? (max.x() - tx) : (min.x() + tx);
-            z = min.z();
+            x = flipX ? (maxX - tx) : (minX + tx);
+            z = minZ;
         } else if (sizeX == 1) {
             boolean flipZ = facing == BlockFace.WEST;
-            x = min.x();
-            z = flipZ ? (max.z() - tx) : (min.z() + tx);
+            x = minX;
+            z = flipZ ? (maxZ - tx) : (minZ + tx);
         } else {
-            x = min.x() + tx;
-            z = min.z();
+            x = minX + tx;
+            z = minZ;
         }
         return new Location(world, x, y, z);
     }
@@ -213,7 +198,6 @@ public final class ScreenManager {
         if (sizeX == 1) {
             return dir.getX() < 0 ? BlockFace.WEST : BlockFace.EAST;
         }
-        // fallback: player's horizontal facing
         float yaw = player.getLocation().getYaw();
         yaw = (yaw % 360 + 360) % 360;
         if (yaw >= 315 || yaw < 45) return BlockFace.SOUTH;
@@ -273,7 +257,7 @@ public final class ScreenManager {
     }
 
     public void shutdown() {
-        // leave frames in world; renderers just stop updating
+        // leave frames in world
     }
 
     public MapColorCache getColorCache() {

@@ -3,7 +3,9 @@ package com.minedoom;
 import com.minedoom.command.DoomCommand;
 import com.minedoom.doom.DoomEngine;
 import com.minedoom.input.DoomInputListener;
+import com.minedoom.input.WandListener;
 import com.minedoom.screen.ScreenManager;
+import com.minedoom.screen.SelectionService;
 import com.minedoom.util.NativeLoader;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -31,11 +33,13 @@ public final class MineDoomPlugin extends JavaPlugin {
 
         Path iwad = NativeLoader.ensureIwad(this, data);
         engine = new DoomEngine(this, iwad);
-        screenManager = new ScreenManager(this);
+        SelectionService selectionService = new SelectionService();
+        screenManager = new ScreenManager(this, selectionService);
         screenManager.load();
 
         inputListener = new DoomInputListener(this, engine, screenManager);
         getServer().getPluginManager().registerEvents(inputListener, this);
+        getServer().getPluginManager().registerEvents(new WandListener(selectionService), this);
 
         DoomCommand cmd = new DoomCommand(this, engine, screenManager, inputListener);
         var doom = getCommand("doom");

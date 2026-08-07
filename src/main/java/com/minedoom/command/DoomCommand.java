@@ -52,13 +52,16 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "help" -> sendHelp(player);
             case "wand" -> {
-                player.performCommand("/wand");
-                player.sendMessage("§eWorldEdit wand given (if WorldEdit is installed).");
-                player.sendMessage("§7Select a §fflat vertical wall§7 (one block thick), then §a/doom place");
+                player.getInventory().addItem(new org.bukkit.inventory.ItemStack(org.bukkit.Material.WOODEN_AXE));
+                if (org.bukkit.Bukkit.getPluginManager().isPluginEnabled("WorldEdit")) {
+                    player.performCommand("wand");
+                }
+                player.sendMessage("§eWooden axe ready (WorldEdit-compatible).");
+                player.sendMessage("§7Left-click pos1 · right-click pos2 on a §fflat vertical wall§7, then §a/doom place");
             }
             case "place", "create", "screen" -> {
                 try {
-                    DoomScreen screen = screens.placeFromWorldEdit(player);
+                    DoomScreen screen = screens.placeFromSelection(player);
                     engine.ensureStarted();
                     player.sendMessage("§aDoom screen placed §7(" + screen.getTilesX() + "x" + screen.getTilesY()
                             + " maps, " + screen.getPixelWidth() + "x" + screen.getPixelHeight() + " px)");
