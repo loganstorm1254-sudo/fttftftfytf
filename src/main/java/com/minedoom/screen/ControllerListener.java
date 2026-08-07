@@ -17,7 +17,6 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCreativeEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -218,7 +217,13 @@ public final class ControllerListener implements Listener {
 
     @EventHandler
     public void onGiveClick(InventoryClickEvent event) {
-        if (!(event.getInventory().getHolder() instanceof GiveMenuHolder)) {
+        if (!(event.getView().getTopInventory().getHolder() instanceof GiveMenuHolder)) {
+            return;
+        }
+        // Only handle clicks in the give menu itself — never touch hotbar / player inv
+        if (event.getClickedInventory() == null
+                || !(event.getClickedInventory().getHolder() instanceof GiveMenuHolder)) {
+            event.setCancelled(true); // prevent shift-click dumping menu items oddly
             return;
         }
         event.setCancelled(true);
@@ -240,31 +245,16 @@ public final class ControllerListener implements Listener {
             overflow.values().forEach(stack ->
                     player.getWorld().dropItemNaturally(player.getLocation(), stack));
         }
+        player.closeInventory();
         player.sendMessage("§aGot §f" + (kind == ScreenKind.GOOGLE ? "Google" : "Doom") + " Screen Switch");
+        player.sendMessage("§7Place it, put a lever on it — ON shows screen, OFF hides it.");
     }
 
     @EventHandler
     public void onGiveDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof GiveMenuHolder) {
+        if (event.getView().getTopInventory().getHolder() instanceof GiveMenuHolder) {
             event.setCancelled(true);
         }
-    }
-
-    /** Creative middle-click on a placed switch returns the tagged MineDoom item. */
-    @EventHandler(priority = EventPriority.HIGH)
-    public void onCreativePick(InventoryCreativeEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
-        Block target = player.getTargetBlockExact(8);
-        if (target == null) {
-            return;
-        }
-        Optional<ControllerStore.Controller> controller = store.get(target.getLocation());
-        if (controller.isEmpty()) {
-            return;
-        }
-        event.setCursor(items.forKind(controller.get().kind()));
     }
 
     private static UUID powerKey(ControllerStore.Controller c) {

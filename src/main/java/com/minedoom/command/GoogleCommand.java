@@ -142,8 +142,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
             case "status" -> {
                 long googleScreens = screens.getScreens().stream().filter(s -> s.getKind() == ScreenKind.GOOGLE).count();
                 player.sendMessage("§eGoogle §7screens=" + googleScreens
-                        + " chrome=" + (browser.isAvailable() ? "§afound" : "§cmissing")
-                        + " §7url=§f" + browser.getCurrentUrl());
+                        + " mode=§ahttp §7url=§f" + browser.getCurrentUrl());
             }
             default -> sendHelp(player);
         }
@@ -157,10 +156,6 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
 
         CompletableFuture.supplyAsync(() -> {
             try {
-                if (!browser.isAvailable()) {
-                    return browser.renderOfflineHome(w, h,
-                            "Install Google Chrome on the server for live Google pages. Then /google home");
-                }
                 return browser.captureRgb(url, w, h);
             } catch (Exception e) {
                 plugin.getLogger().warning("Google capture failed: " + e.getMessage());
@@ -183,7 +178,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/google refresh §7— reload current page");
         player.sendMessage("§e/google give §7— open switch blocks (lever show/hide)");
         player.sendMessage("§e/google remove §7— remove nearest Google screen");
-        player.sendMessage("§8Needs Chrome/Chromium on the server for live pages.");
+        player.sendMessage("§8No Chrome needed — works on MineKeep / shared hosts.");
     }
 
     @Override
