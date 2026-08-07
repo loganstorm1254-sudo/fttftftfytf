@@ -6,6 +6,9 @@ import com.minedoom.doom.DoomEngine;
 import com.minedoom.google.GoogleBrowser;
 import com.minedoom.input.DoomInputListener;
 import com.minedoom.input.WandListener;
+import com.minedoom.screen.ControllerItems;
+import com.minedoom.screen.ControllerListener;
+import com.minedoom.screen.ControllerStore;
 import com.minedoom.screen.ScreenManager;
 import com.minedoom.screen.SelectionService;
 import com.minedoom.util.NativeLoader;
@@ -19,6 +22,9 @@ public final class MineDoomPlugin extends JavaPlugin {
     private ScreenManager screenManager;
     private DoomInputListener inputListener;
     private GoogleBrowser googleBrowser;
+    private ControllerItems controllerItems;
+    private ControllerStore controllerStore;
+    private ControllerListener controllerListener;
     private boolean doomAvailable;
 
     @Override
@@ -43,14 +49,18 @@ public final class MineDoomPlugin extends JavaPlugin {
         screenManager.load();
 
         googleBrowser = new GoogleBrowser(this);
-
+        controllerItems = new ControllerItems(this);
+        controllerStore = new ControllerStore(this);
+        controllerStore.load();
+        controllerListener = new ControllerListener(this, screenManager, controllerStore, controllerItems);
+        getServer().getPluginManager().registerEvents(controllerListener, this);
         getServer().getPluginManager().registerEvents(new WandListener(selectionService), this);
 
         if (doomAvailable) {
             inputListener = new DoomInputListener(this, engine, screenManager);
             getServer().getPluginManager().registerEvents(inputListener, this);
 
-            DoomCommand cmd = new DoomCommand(this, engine, screenManager, inputListener);
+            DoomCommand cmd = new DoomCommand(this, engine, screenManager, inputListener, controllerListener);
             var doom = getCommand("doom");
             if (doom != null) {
                 doom.setExecutor(cmd);
@@ -58,7 +68,7 @@ public final class MineDoomPlugin extends JavaPlugin {
             }
         }
 
-        GoogleCommand googleCmd = new GoogleCommand(this, screenManager, googleBrowser);
+        GoogleCommand googleCmd = new GoogleCommand(this, screenManager, googleBrowser, controllerListener);
         var google = getCommand("google");
         if (google != null) {
             google.setExecutor(googleCmd);
@@ -67,7 +77,7 @@ public final class MineDoomPlugin extends JavaPlugin {
 
         getLogger().info("MineDoom enabled — "
                 + (doomAvailable ? "PureDOOM ready (/doom)" : "DOOM unavailable")
-                + " · Google screens via /google");
+                + " · Google screens via /google · switches via /doom give");
     }
 
     @Override
@@ -78,6 +88,9 @@ public final class MineDoomPlugin extends JavaPlugin {
         if (screenManager != null) {
             screenManager.save();
             screenManager.shutdown();
+        }
+        if (controllerStore != null) {
+            controllerStore.save();
         }
         if (engine != null) {
             engine.shutdown();
@@ -92,8 +105,20 @@ public final class MineDoomPlugin extends JavaPlugin {
         return screenManager;
     }
 
+    public DoomInputListener getInputListener() {
+        return inputListener;
+    }
+
     public GoogleBrowser getGoogleBrowser() {
         return googleBrowser;
+    }
+
+    public ControllerItems getControllerItems() {
+        return controllerItems;
+    }
+
+    public ControllerStore getControllerStore() {
+        return controllerStore;
     }
 
     public boolean isDoomAvailable() {

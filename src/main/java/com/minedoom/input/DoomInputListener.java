@@ -130,6 +130,21 @@ public final class DoomInputListener implements Listener {
         player.sendMessage("§7Left the DOOM screen.");
     }
 
+    public void stopPlayingOnScreen(UUID screenId) {
+        for (UUID playerId : new HashSet<>(sessions.keySet())) {
+            PlaySession session = sessions.get(playerId);
+            if (session != null && session.screenId.equals(screenId)) {
+                Player p = Bukkit.getPlayer(playerId);
+                if (p != null) {
+                    stopPlaying(p);
+                } else {
+                    sessions.remove(playerId);
+                    session.seat.remove();
+                }
+            }
+        }
+    }
+
     public void stopAll() {
         for (UUID id : new HashSet<>(sessions.keySet())) {
             Player p = Bukkit.getPlayer(id);

@@ -2,6 +2,7 @@ package com.minedoom.command;
 
 import com.minedoom.MineDoomPlugin;
 import com.minedoom.google.GoogleBrowser;
+import com.minedoom.screen.ControllerListener;
 import com.minedoom.screen.DoomScreen;
 import com.minedoom.screen.ScreenKind;
 import com.minedoom.screen.ScreenManager;
@@ -28,11 +29,18 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
     private final MineDoomPlugin plugin;
     private final ScreenManager screens;
     private final GoogleBrowser browser;
+    private final ControllerListener controllers;
 
-    public GoogleCommand(MineDoomPlugin plugin, ScreenManager screens, GoogleBrowser browser) {
+    public GoogleCommand(
+            MineDoomPlugin plugin,
+            ScreenManager screens,
+            GoogleBrowser browser,
+            ControllerListener controllers
+    ) {
         this.plugin = plugin;
         this.screens = screens;
         this.browser = browser;
+        this.controllers = controllers;
     }
 
     @Override
@@ -72,7 +80,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                 }
             }
             case "home" -> {
-                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 24, ScreenKind.GOOGLE);
+                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Google screen nearby. §7/google wand → /google place");
                     return true;
@@ -84,7 +92,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cUsage: /google search <query>");
                     return true;
                 }
-                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 24, ScreenKind.GOOGLE);
+                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Google screen nearby. §7/google wand → /google place");
                     return true;
@@ -97,7 +105,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cUsage: /google go <url>");
                     return true;
                 }
-                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 24, ScreenKind.GOOGLE);
+                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Google screen nearby.");
                     return true;
@@ -110,7 +118,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                 loadUrl(player, screen.get(), url, url);
             }
             case "refresh", "reload" -> {
-                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 24, ScreenKind.GOOGLE);
+                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Google screen nearby.");
                     return true;
@@ -130,6 +138,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                 screens.remove(screen.get());
                 player.sendMessage("§aGoogle screen removed.");
             }
+            case "give", "blocks", "switch", "switches" -> controllers.openGiveMenu(player);
             case "status" -> {
                 long googleScreens = screens.getScreens().stream().filter(s -> s.getKind() == ScreenKind.GOOGLE).count();
                 player.sendMessage("§eGoogle §7screens=" + googleScreens
@@ -172,6 +181,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/google search <query> §7— search Google");
         player.sendMessage("§e/google go <url> §7— open a URL");
         player.sendMessage("§e/google refresh §7— reload current page");
+        player.sendMessage("§e/google give §7— open switch blocks (lever show/hide)");
         player.sendMessage("§e/google remove §7— remove nearest Google screen");
         player.sendMessage("§8Needs Chrome/Chromium on the server for live pages.");
     }
@@ -179,7 +189,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            List<String> opts = Arrays.asList("wand", "place", "home", "search", "go", "refresh", "remove", "status", "help");
+            List<String> opts = Arrays.asList("wand", "place", "home", "search", "go", "refresh", "remove", "give", "status", "help");
             String p = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();
             for (String o : opts) {

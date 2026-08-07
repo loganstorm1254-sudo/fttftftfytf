@@ -72,6 +72,35 @@ public final class ScreenManager {
         return Optional.ofNullable(best);
     }
 
+    /** Nearest matching screen for lever switches — includes hidden ones. */
+    public Optional<DoomScreen> findNearestIncludingHidden(Location loc, double maxDist, ScreenKind kind) {
+        return findNearest(loc, maxDist, kind);
+    }
+
+    /** Nearest visible screen (for play / browse). */
+    public Optional<DoomScreen> findNearestVisible(Location loc, double maxDist, ScreenKind kind) {
+        DoomScreen best = null;
+        double bestDist = maxDist * maxDist;
+        for (DoomScreen screen : screens.values()) {
+            if (screen.isHidden()) {
+                continue;
+            }
+            if (kind != null && screen.getKind() != kind) {
+                continue;
+            }
+            if (loc.getWorld() == null || !screen.getWorldName().equals(loc.getWorld().getName())) {
+                continue;
+            }
+            Location c = screen.getCenter(loc.getWorld());
+            double d = c.distanceSquared(loc);
+            if (d < bestDist) {
+                bestDist = d;
+                best = screen;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
     public DoomScreen placeFromSelection(Player player) throws Exception {
         return placeFromSelection(player, ScreenKind.DOOM);
     }
@@ -280,7 +309,122 @@ public final class ScreenManager {
     }
 
     public void pushImage(DoomScreen screen, byte[] rgb, int w, int h) {
+        if (screen.isHidden()) {
+            return;
+        }
         screen.pushFrame(rgb, w, h);
+    }
+
+    /** Remove item frames so the wall face is plain air; keeps screen data for later show. */
+    public void hideScreen(DoomScreen screen) {
+        if (screen.isHidden()) {
+            return;
+        }
+        var input = plugin.getInputListener();
+        if (input != null) {
+            input.stopPlayingOnScreen(screen.getId());
+        }
+        World world = Bukkit.getWorld(screen.getWorldName());
+        if (world != null) {
+            screen.removeDisplays(world);
+            screen.replaceDisplayIds(List.of());
+        }
+        screen.setHidden(true);
+        save();
+        plugin.getLogger().info("Hid " + screen.getKind() + " screen " + screen.getId());
+    }
+
+    /** Respawn map frames for a previously hidden screen. */
+    public void showScreen(DoomScreen screen) throws Exception {
+        if (!screen.isHidden()) {
+            return;
+        }
+        World world = Bukkit.getWorld(screen.getWorldName());
+        if (world == null) {
+            throw new IllegalStateException("World not loaded: " + screen.getWorldName());
+        }
+
+        int minX = screen.getMinX();
+        int minY = screen.getMinY();
+        int minZ = screen.getMinZ();
+        int maxX = screen.getMaxX();
+        int maxY = screen.getMaxY();
+        int maxZ = screen.getMaxZ();
+        int sizeX = screen.getSizeX();
+        int sizeZ = screen.getSizeZ();
+        BlockFace facing = screen.getFacing();
+        int tilesX = screen.getTilesX();
+        int tilesY = screen.getTilesY();
+
+        // Clear any leftover entities in the region
+        Location sweep = screen.getCenter(world);
+        double radius = Math.max(Math.max(tilesX, tilesY), 2) + 3;
+        world.getNearbyEntities(sweep, radius, radius, radius).forEach(e -> {
+            if (e.getScoreboardTags().contains("minedoom_screen")
+                    || e instanceof org.bukkit.entity.ItemFrame
+                    || e instanceof org.bukkit.entity.ItemDisplay) {
+                Location el = e.getLocation();
+                if (el.getBlockX() >= minX - 1 && el.getBlockX() <= maxX + 1
+                        && el.getBlockY() >= minY - 1 && el.getBlockY() <= maxY + 1
+                        && el.getBlockZ() >= minZ - 1 && el.getBlockZ() <= maxZ + 1) {
+                    e.remove();
+                }
+            }
+        });
+
+        List<UUID> frameIds = new ArrayList<>();
+        List<org.bukkit.entity.ItemFrame> frames = new ArrayList<>();
+        String mapLabel = screen.getKind() == ScreenKind.GOOGLE ? "§eGoogle" : "§cMineDoom";
+
+        for (int ty = 0; ty < tilesY; ty++) {
+            for (int tx = 0; tx < tilesX; tx++) {
+                Location wallLoc = tileLocation(world, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tx, ty);
+                Block wallBlock = wallLoc.getBlock();
+                if (!wallBlock.getType().isSolid()) {
+                    throw new IllegalStateException("Cannot show screen — wall block missing at "
+                            + wallBlock.getX() + "," + wallBlock.getY() + "," + wallBlock.getZ());
+                }
+                org.bukkit.entity.ItemFrame frame = FramePlacer.spawnOnWallFace(world, wallBlock, facing);
+                frames.add(frame);
+                frameIds.add(frame.getUniqueId());
+            }
+        }
+
+        List<Integer> mapIds = screen.getMapIds();
+        for (int i = 0; i < frames.size(); i++) {
+            org.bukkit.entity.ItemFrame frame = frames.get(i);
+            MapView view = null;
+            if (i < mapIds.size()) {
+                view = Bukkit.getMap(mapIds.get(i));
+            }
+            if (view == null) {
+                view = Bukkit.createMap(world);
+                view.setTrackingPosition(false);
+                view.setUnlimitedTracking(false);
+                view.setLocked(true);
+                for (var r : new ArrayList<>(view.getRenderers())) {
+                    view.removeRenderer(r);
+                }
+                if (i < mapIds.size()) {
+                    mapIds.set(i, view.getId());
+                } else {
+                    mapIds.add(view.getId());
+                }
+            }
+            ItemStack mapItem = new ItemStack(Material.FILLED_MAP);
+            MapMeta meta = (MapMeta) mapItem.getItemMeta();
+            meta.setMapView(view);
+            meta.setDisplayName(mapLabel);
+            mapItem.setItemMeta(meta);
+            frame.setItem(mapItem, false);
+        }
+
+        screen.replaceDisplayIds(frameIds);
+        screen.setHidden(false);
+        screen.attachRenderers(colorCache);
+        save();
+        broadcastMaps(screen, sweep, 64);
+        plugin.getLogger().info("Showed " + screen.getKind() + " screen " + screen.getId());
     }
 
     public void broadcastMaps(DoomScreen screen, Location around, double radius) {
@@ -369,7 +513,7 @@ public final class ScreenManager {
         // Item frames watch maps themselves; occasional sendMap helps first paint
         boolean send = (broadcastTick % 20) == 0;
         for (DoomScreen screen : screens.values()) {
-            if (screen.getKind() != ScreenKind.DOOM) {
+            if (screen.getKind() != ScreenKind.DOOM || screen.isHidden()) {
                 continue;
             }
             screen.pushFrame(rgb, w, h);
@@ -398,6 +542,13 @@ public final class ScreenManager {
                 DoomScreen screen = DoomScreen.read(child);
                 screen.attachRenderers(colorCache);
                 screens.put(screen.getId(), screen);
+                if (screen.isHidden()) {
+                    World world = Bukkit.getWorld(screen.getWorldName());
+                    if (world != null) {
+                        screen.removeDisplays(world);
+                        screen.replaceDisplayIds(List.of());
+                    }
+                }
             } catch (Exception e) {
                 plugin.getLogger().warning("Failed to load screen " + key + ": " + e.getMessage());
             }

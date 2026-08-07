@@ -26,6 +26,7 @@ public final class DoomScreen {
     private final int tilesY;
     private final List<Integer> mapIds;
     private final List<UUID> displayIds;
+    private boolean hidden;
     private transient DoomMapRenderer[] renderers;
 
     public DoomScreen(
@@ -39,6 +40,22 @@ public final class DoomScreen {
             int tilesY,
             List<Integer> mapIds,
             List<UUID> displayIds
+    ) {
+        this(id, kind, worldName, minX, minY, minZ, maxX, maxY, maxZ, facing, tilesX, tilesY, mapIds, displayIds, false);
+    }
+
+    public DoomScreen(
+            UUID id,
+            ScreenKind kind,
+            String worldName,
+            int minX, int minY, int minZ,
+            int maxX, int maxY, int maxZ,
+            BlockFace facing,
+            int tilesX,
+            int tilesY,
+            List<Integer> mapIds,
+            List<UUID> displayIds,
+            boolean hidden
     ) {
         this.id = id;
         this.kind = kind == null ? ScreenKind.DOOM : kind;
@@ -54,6 +71,7 @@ public final class DoomScreen {
         this.tilesY = tilesY;
         this.mapIds = new ArrayList<>(mapIds);
         this.displayIds = new ArrayList<>(displayIds);
+        this.hidden = hidden;
     }
 
     public UUID getId() {
@@ -101,6 +119,34 @@ public final class DoomScreen {
         return displayIds;
     }
 
+    public boolean isHidden() {
+        return hidden;
+    }
+
+    public void setHidden(boolean hidden) {
+        this.hidden = hidden;
+    }
+
+    public int getMinX() { return minX; }
+    public int getMinY() { return minY; }
+    public int getMinZ() { return minZ; }
+    public int getMaxX() { return maxX; }
+    public int getMaxY() { return maxY; }
+    public int getMaxZ() { return maxZ; }
+
+    public int getSizeX() {
+        return maxX - minX + 1;
+    }
+
+    public int getSizeZ() {
+        return maxZ - minZ + 1;
+    }
+
+    public void replaceDisplayIds(List<UUID> newIds) {
+        displayIds.clear();
+        displayIds.addAll(newIds);
+    }
+
     public Location getCenter(org.bukkit.World world) {
         return new Location(world, (minX + maxX) / 2.0 + 0.5, (minY + maxY) / 2.0 + 0.5, (minZ + maxZ) / 2.0 + 0.5);
     }
@@ -140,7 +186,7 @@ public final class DoomScreen {
     }
 
     public void pushFrame(byte[] doomRgb, int doomW, int doomH) {
-        if (renderers == null) {
+        if (hidden || renderers == null) {
             return;
         }
         for (DoomMapRenderer renderer : renderers) {
@@ -189,6 +235,7 @@ public final class DoomScreen {
         }
         section.set("displayIds", ids);
         section.set("frameIds", ids); // back-compat
+        section.set("hidden", hidden);
     }
 
     public static DoomScreen read(ConfigurationSection section) {
@@ -215,7 +262,8 @@ public final class DoomScreen {
                 section.getInt("tilesX"),
                 section.getInt("tilesY"),
                 maps,
-                displays
+                displays,
+                section.getBoolean("hidden", false)
         );
     }
 

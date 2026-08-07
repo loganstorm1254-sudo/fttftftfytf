@@ -4,6 +4,7 @@ import com.minedoom.MineDoomPlugin;
 import com.minedoom.doom.DoomEngine;
 import com.minedoom.doom.PureDoomNative;
 import com.minedoom.input.DoomInputListener;
+import com.minedoom.screen.ControllerListener;
 import com.minedoom.screen.DoomScreen;
 import com.minedoom.screen.ScreenKind;
 import com.minedoom.screen.ScreenManager;
@@ -27,12 +28,20 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
     private final DoomEngine engine;
     private final ScreenManager screens;
     private final DoomInputListener input;
+    private final ControllerListener controllers;
 
-    public DoomCommand(MineDoomPlugin plugin, DoomEngine engine, ScreenManager screens, DoomInputListener input) {
+    public DoomCommand(
+            MineDoomPlugin plugin,
+            DoomEngine engine,
+            ScreenManager screens,
+            DoomInputListener input,
+            ControllerListener controllers
+    ) {
         this.plugin = plugin;
         this.engine = engine;
         this.screens = screens;
         this.input = input;
+        this.controllers = controllers;
     }
 
     @Override
@@ -83,7 +92,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
                 }
             }
             case "play", "start" -> {
-                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 16, ScreenKind.DOOM);
+                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 16, ScreenKind.DOOM);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Doom screen nearby. §7Select a wall with the WorldEdit axe and §a/doom place");
                     return true;
@@ -128,6 +137,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
                 plugin.getServer().getScheduler().runTaskLater(plugin, () -> engine.keyUp(PureDoomNative.KEY_ESCAPE), 2L);
                 player.sendMessage("§7Sent ESC");
             }
+            case "give", "blocks", "switch", "switches" -> controllers.openGiveMenu(player);
             case "status" -> {
                 long doomScreens = screens.getScreens().stream().filter(s -> s.getKind() == ScreenKind.DOOM).count();
                 player.sendMessage("§cMineDoom §7screens=" + doomScreens
@@ -147,6 +157,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/doom play §7— sit down and play with keyboard & mouse");
         player.sendMessage("§e/doom stop §7— exit play mode");
         player.sendMessage("§e/doom remove §7— remove nearest screen");
+        player.sendMessage("§e/doom give §7— open switch blocks (lever show/hide)");
         player.sendMessage("§e/doom enter §7— press Enter (menus)");
         player.sendMessage("§e/doom esc §7— press Escape");
         player.sendMessage("§8Controls: WASD · mouse look · LMB fire · RMB use · Sprint run · hotbar weapons");
@@ -155,7 +166,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            List<String> opts = Arrays.asList("wand", "place", "here", "play", "stop", "remove", "enter", "esc", "status", "help");
+            List<String> opts = Arrays.asList("wand", "place", "here", "play", "stop", "remove", "give", "enter", "esc", "status", "help");
             String p = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();
             for (String o : opts) {

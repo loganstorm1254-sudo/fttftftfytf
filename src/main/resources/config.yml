@@ -13,6 +13,9 @@ mouse-sensitivity: 8.0
 # Invert mouse Y (Minecraft pitch)
 invert-mouse-y: false
 
+# How far a screen switch looks for its matching screen (blocks)
+switch-range: 48
+
 # Google wall screens (/google) — needs Chrome/Chromium on the server
 google:
   # Absolute path to chrome binary, or leave blank to auto-detect
