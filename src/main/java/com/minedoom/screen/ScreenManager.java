@@ -148,9 +148,9 @@ public final class ScreenManager {
 
         World world = player.getWorld();
 
-        // Clear any previous MineDoom displays in this region first
+        // Clear previous MineDoom entities in this region
         Location sweep = new Location(world, (minX + maxX) / 2.0 + 0.5, (minY + maxY) / 2.0 + 0.5, (minZ + maxZ) / 2.0 + 0.5);
-        double radius = Math.max(Math.max(tilesX, tilesY), 2) + 2;
+        double radius = Math.max(Math.max(tilesX, tilesY), 2) + 3;
         world.getNearbyEntities(sweep, radius, radius, radius).forEach(e -> {
             if (e.getScoreboardTags().contains("minedoom_screen")
                     || e instanceof org.bukkit.entity.ItemFrame
@@ -165,44 +165,49 @@ public final class ScreenManager {
         });
 
         List<Integer> mapIds = new ArrayList<>();
-        List<UUID> displayIds = new ArrayList<>();
+        List<UUID> frameIds = new ArrayList<>();
         java.util.Set<String> usedBlocks = new java.util.HashSet<>();
+        List<org.bukkit.entity.ItemFrame> frames = new ArrayList<>();
 
+        // 1) Spawn every frame first (sky→teleport trick), no maps yet
         for (int ty = 0; ty < tilesY; ty++) {
             for (int tx = 0; tx < tilesX; tx++) {
                 Location wallLoc = tileLocation(world, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tx, ty);
                 Block wallBlock = wallLoc.getBlock();
                 String key = wallBlock.getX() + "," + wallBlock.getY() + "," + wallBlock.getZ();
                 if (!usedBlocks.add(key)) {
-                    throw new IllegalStateException("Internal grid bug: duplicate tile at " + key
-                            + " (tx=" + tx + " ty=" + ty + "). Selection="
-                            + sizeX + "x" + tilesY + "x" + sizeZ);
+                    throw new IllegalStateException("Internal grid bug: duplicate tile at " + key);
                 }
                 if (!wallBlock.getType().isSolid()) {
                     throw new IllegalStateException("Selection block at " + key
                             + " is not solid (" + wallBlock.getType() + "). Select solid wall blocks.");
                 }
 
-                MapView view = Bukkit.createMap(world);
-                view.setTrackingPosition(false);
-                view.setUnlimitedTracking(false);
-                view.setLocked(true);
-                for (var r : new ArrayList<>(view.getRenderers())) {
-                    view.removeRenderer(r);
-                }
-
-                ItemStack mapItem = new ItemStack(Material.FILLED_MAP);
-                MapMeta meta = (MapMeta) mapItem.getItemMeta();
-                meta.setMapView(view);
-                meta.setDisplayName("§cMineDoom Screen");
-                mapItem.setItemMeta(meta);
-
-                var display = FramePlacer.spawnMapDisplay(world, wallBlock, facing, mapItem);
-                player.sendMap(view);
-
-                mapIds.add(view.getId());
-                displayIds.add(display.getUniqueId());
+                org.bukkit.entity.ItemFrame frame = FramePlacer.spawnOnWallFace(world, wallBlock, facing);
+                frames.add(frame);
+                frameIds.add(frame.getUniqueId());
             }
+        }
+
+        // 2) Attach unique maps to each frame
+        for (int i = 0; i < frames.size(); i++) {
+            org.bukkit.entity.ItemFrame frame = frames.get(i);
+            MapView view = Bukkit.createMap(world);
+            view.setTrackingPosition(false);
+            view.setUnlimitedTracking(false);
+            view.setLocked(true);
+            for (var r : new ArrayList<>(view.getRenderers())) {
+                view.removeRenderer(r);
+            }
+
+            ItemStack mapItem = new ItemStack(Material.FILLED_MAP);
+            MapMeta meta = (MapMeta) mapItem.getItemMeta();
+            meta.setMapView(view);
+            meta.setDisplayName("§cMineDoom");
+            mapItem.setItemMeta(meta);
+            frame.setItem(mapItem, false);
+            player.sendMap(view);
+            mapIds.add(view.getId());
         }
 
         if (mapIds.size() != tilesX * tilesY) {
@@ -218,7 +223,7 @@ public final class ScreenManager {
                 tilesX,
                 tilesY,
                 mapIds,
-                displayIds
+                frameIds
         );
         screen.attachRenderers(colorCache);
         screens.put(screen.getId(), screen);
@@ -233,7 +238,7 @@ public final class ScreenManager {
         screen.pushFrame(placeholder, plugin.getEngine().getWidth(), plugin.getEngine().getHeight());
         broadcastMaps(screen, player.getLocation(), 48);
 
-        player.sendMessage("§7Placed §f" + mapIds.size() + "§7 tiles (" + tilesX + "×" + tilesY
+        player.sendMessage("§7Placed §f" + mapIds.size() + "§7 map frames (" + tilesX + "×" + tilesY
                 + ") facing §f" + facing);
 
         plugin.getLogger().info("Placed Doom screen " + screen.getId() + " "
@@ -325,7 +330,8 @@ public final class ScreenManager {
 
     public void pushFrameToAll(byte[] rgb, int w, int h) {
         broadcastTick++;
-        boolean send = (broadcastTick % 3) == 0; // ~6.6 Hz map packets
+        // Item frames watch maps themselves; occasional sendMap helps first paint
+        boolean send = (broadcastTick % 20) == 0;
         for (DoomScreen screen : screens.values()) {
             screen.pushFrame(rgb, w, h);
             if (send) {

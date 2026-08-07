@@ -147,10 +147,12 @@ public final class DoomScreen {
         for (UUID displayId : displayIds) {
             Entity e = world.getEntity(displayId);
             if (e != null) {
+                if (e instanceof org.bukkit.entity.ItemFrame frame) {
+                    frame.setItem(null);
+                }
                 e.remove();
             }
         }
-        // Also sweep tagged leftovers in the region
         Location c = getCenter(world);
         double radius = Math.max(tilesX, tilesY) + 2;
         for (Entity e : world.getNearbyEntities(c, radius, radius, radius)) {

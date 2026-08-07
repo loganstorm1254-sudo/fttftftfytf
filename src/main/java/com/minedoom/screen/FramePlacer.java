@@ -1,72 +1,83 @@
 package com.minedoom.screen;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.entity.Display;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.util.Transformation;
-import org.joml.AxisAngle4f;
-import org.joml.Vector3f;
+import org.bukkit.entity.ItemFrame;
 
 /**
- * Places a filled map as a flat {@link ItemDisplay} on a wall face.
- * <p>
- * ItemFrames were unreliable: Bukkit's hanging spawner attaches to neighboring
- * wall blocks and adjacent frames collide, leaving a single tile.
+ * Spawns item frames on a wall face without the Bukkit hanging-collision bug.
+ *
+ * <p>Bukkit's ItemFrame spawner searches neighboring blocks for attachment and
+ * aborts when another hanging entity is nearby — that left only one corner tile.
+ * We spawn in empty sky first, then teleport onto the wall face.
  */
 public final class FramePlacer {
 
     private FramePlacer() {}
 
-    public static ItemDisplay spawnMapDisplay(World world, Block wallBlock, BlockFace outward, ItemStack mapItem) {
+    public static ItemFrame spawnOnWallFace(World world, Block wallBlock, BlockFace outward) {
         if (outward != BlockFace.NORTH && outward != BlockFace.SOUTH
                 && outward != BlockFace.EAST && outward != BlockFace.WEST) {
             throw new IllegalStateException("Facing must be NORTH/SOUTH/EAST/WEST, got " + outward);
         }
 
-        Location loc = wallBlock.getLocation().add(0.5, 0.5, 0.5);
-        loc.add(outward.getDirection().multiply(0.51));
-        loc.setDirection(outward.getDirection());
+        Block air = wallBlock.getRelative(outward);
+        if (air.getType().isSolid()) {
+            throw new IllegalStateException(
+                    "No air on the " + outward + " side of "
+                            + wallBlock.getX() + "," + wallBlock.getY() + "," + wallBlock.getZ()
+                            + " (found " + air.getType() + "). Stand on the open side of the wall.");
+        }
+        if (!air.getType().isAir()) {
+            air.setType(Material.AIR);
+        }
 
-        world.getNearbyEntities(loc, 0.45, 0.45, 0.45).forEach(e -> {
-            if (e instanceof ItemDisplay || e instanceof org.bukkit.entity.ItemFrame) {
+        // Clear anything already in this air cell
+        Location airCenter = air.getLocation().add(0.5, 0.5, 0.5);
+        for (Entity e : world.getNearbyEntities(airCenter, 0.45, 0.45, 0.45)) {
+            if (e instanceof ItemFrame || e instanceof ItemDisplay) {
                 e.remove();
             }
-        });
-
-        // Tip the flat map item upright (item model lies flat by default), then entity yaw faces outward
-        AxisAngle4f tipUp = new AxisAngle4f((float) (-Math.PI / 2.0), 1f, 0f, 0f);
-        Transformation transform = new Transformation(
-                new Vector3f(0f, 0f, 0f),
-                tipUp,
-                new Vector3f(1.0f, 1.0f, 1.0f),
-                new AxisAngle4f(0f, 0f, 0f, 1f)
-        );
-
-        ItemDisplay display = world.spawn(loc, ItemDisplay.class, d -> {
-            d.setItemStack(mapItem.clone());
-            d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
-            d.setBillboard(Display.Billboard.FIXED);
-            d.setTransformation(transform);
-            d.setBrightness(new Display.Brightness(15, 15));
-            d.setShadowRadius(0f);
-            d.setShadowStrength(0f);
-            d.setDisplayWidth(1.0f);
-            d.setDisplayHeight(1.0f);
-            d.setTeleportDuration(0);
-            d.setInterpolationDuration(0);
-            d.setPersistent(true);
-            d.setInvulnerable(true);
-            d.addScoreboardTag("minedoom_screen");
-        });
-
-        if (!display.isValid()) {
-            throw new IllegalStateException("Failed to spawn map display on "
-                    + wallBlock.getX() + "," + wallBlock.getY() + "," + wallBlock.getZ());
         }
-        return display;
+
+        // Spawn far above so createHanging won't collide with sibling frames
+        Location sky = air.getLocation().clone().add(0, 80 + (air.getY() % 7), 0);
+        ItemFrame frame = world.spawn(sky, ItemFrame.class, f -> {
+            f.setVisible(true);
+            f.setFixed(true);
+            f.setInvulnerable(true);
+            f.setSilent(true);
+            f.setGravity(false);
+            f.setItemDropChance(0f);
+            f.addScoreboardTag("minedoom_screen");
+        });
+
+        // Move onto the wall face and force facing toward the viewer
+        Location seat = air.getLocation(); // block origin — Bukkit hanging pos
+        frame.teleport(seat);
+        boolean ok = frame.setFacingDirection(outward, true);
+        if (!ok) {
+            frame.setFacingDirection(outward, true);
+        }
+
+        // If still inside the wall somehow, nudge back to air and re-face
+        if (frame.getLocation().getBlock().equals(wallBlock)) {
+            frame.teleport(seat);
+            frame.setFacingDirection(outward, true);
+        }
+
+        if (!frame.isValid()) {
+            throw new IllegalStateException("Item frame despawned at "
+                    + air.getX() + "," + air.getY() + "," + air.getZ());
+        }
+
+        frame.setFixed(true);
+        frame.setInvulnerable(true);
+        return frame;
     }
 }
