@@ -97,11 +97,12 @@ public final class DoomScreen {
     public Location getSeatLocation(org.bukkit.World world) {
         Location center = getCenter(world);
         double dist = 3.0;
+        // Sit on the front side of the screen (same side as facing)
         return switch (facing) {
-            case NORTH -> center.clone().add(0, -1, dist);
-            case SOUTH -> center.clone().add(0, -1, -dist);
-            case WEST -> center.clone().add(dist, -1, 0);
-            case EAST -> center.clone().add(-dist, -1, 0);
+            case NORTH -> center.clone().add(0, -1, -dist);
+            case SOUTH -> center.clone().add(0, -1, dist);
+            case WEST -> center.clone().add(-dist, -1, 0);
+            case EAST -> center.clone().add(dist, -1, 0);
             default -> center.clone().add(0, -1, dist);
         };
     }

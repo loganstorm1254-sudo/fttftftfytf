@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.map.MapView;
-import org.bukkit.util.Vector;
 
 import java.io.File;
 import java.io.IOException;
@@ -89,7 +88,8 @@ public final class ScreenManager {
             throw new IllegalStateException("Floor/ceiling selections are not supported — select a vertical wall.");
         }
 
-        BlockFace facing = resolveFacing(player, sizeX, sizeZ);
+        // Place on the side the player is standing on
+        BlockFace facing = resolveFacingFromPlayerPosition(player, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ);
         int tilesX;
         int tilesY = sizeY;
         if (sizeZ == 1) {
@@ -107,34 +107,53 @@ public final class ScreenManager {
             throw new IllegalStateException("Screen too large (max 64 maps). Try a smaller selection, e.g. 3x2.");
         }
 
+        plugin.getEngine().ensureStarted();
+
         World world = player.getWorld();
         List<Integer> mapIds = new ArrayList<>();
         List<UUID> frameIds = new ArrayList<>();
 
         for (int ty = 0; ty < tilesY; ty++) {
             for (int tx = 0; tx < tilesX; tx++) {
-                Location blockLoc = tileLocation(world, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tx, ty);
-                Location frameLoc = blockLoc.clone().add(facing.getModX(), facing.getModY(), facing.getModZ());
-                frameLoc.add(0.5, 0.5, 0.5);
-                ItemFrame frame = world.spawn(frameLoc, ItemFrame.class, f -> {
+                Location wallBlock = tileLocation(world, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tx, ty);
+
+                // Item frames attach TO the wall block and hang on the `facing` side
+                // (Bukkit setFacingDirection moves the entity onto that face)
+                Location attachAt = wallBlock.getBlock().getLocation();
+
+                attachAt.getWorld().getNearbyEntities(attachAt.clone().add(0.5, 0.5, 0.5), 0.75, 0.75, 0.75)
+                        .stream()
+                        .filter(e -> e instanceof ItemFrame)
+                        .forEach(org.bukkit.entity.Entity::remove);
+
+                ItemFrame frame = world.spawn(attachAt, org.bukkit.entity.GlowItemFrame.class, f -> {
                     f.setFacingDirection(facing, true);
-                    f.setVisible(false);
+                    f.setVisible(true);
                     f.setFixed(true);
                     f.setInvulnerable(true);
                     f.setSilent(true);
+                    f.setGravity(false);
                 });
+
+                if (!frame.isValid()) {
+                    throw new IllegalStateException("Failed to spawn item frame on wall at "
+                            + attachAt.getBlockX() + "," + attachAt.getBlockY() + "," + attachAt.getBlockZ()
+                            + " facing " + facing);
+                }
 
                 MapView view = Bukkit.createMap(world);
                 view.setTrackingPosition(false);
                 view.setUnlimitedTracking(false);
-                view.getRenderers().forEach(view::removeRenderer);
+                view.setLocked(true);
+                view.getRenderers().clear();
 
                 ItemStack mapItem = new ItemStack(Material.FILLED_MAP);
                 MapMeta meta = (MapMeta) mapItem.getItemMeta();
                 meta.setMapView(view);
                 meta.setDisplayName("§cMineDoom Screen");
                 mapItem.setItemMeta(meta);
-                frame.setItem(mapItem);
+                frame.setItem(mapItem, false);
+                player.sendMap(view);
 
                 mapIds.add(view.getId());
                 frameIds.add(frame.getUniqueId());
@@ -156,8 +175,23 @@ public final class ScreenManager {
         screens.put(screen.getId(), screen);
         save();
 
-        byte[] black = new byte[plugin.getEngine().getWidth() * plugin.getEngine().getHeight() * 3];
-        screen.pushFrame(black, plugin.getEngine().getWidth(), plugin.getEngine().getHeight());
+        byte[] placeholder = new byte[plugin.getEngine().getWidth() * plugin.getEngine().getHeight() * 3];
+        for (int i = 0; i < placeholder.length; i += 3) {
+            placeholder[i] = 20;
+            placeholder[i + 1] = 20;
+            placeholder[i + 2] = 24;
+        }
+        screen.pushFrame(placeholder, plugin.getEngine().getWidth(), plugin.getEngine().getHeight());
+
+        for (int mapId : mapIds) {
+            MapView view = Bukkit.getMap(mapId);
+            if (view != null) {
+                player.sendMap(view);
+            }
+        }
+
+        plugin.getLogger().info("Placed Doom screen " + screen.getId() + " "
+                + tilesX + "x" + tilesY + " facing " + facing + " maps=" + mapIds);
 
         return screen;
     }
@@ -190,20 +224,35 @@ public final class ScreenManager {
         return new Location(world, x, y, z);
     }
 
-    private static BlockFace resolveFacing(Player player, int sizeX, int sizeZ) {
-        Vector dir = player.getLocation().getDirection();
+    /**
+     * Pick the wall face closest to the player (the side they are standing on).
+     */
+    private static BlockFace resolveFacingFromPlayerPosition(
+            Player player,
+            int minX, int minY, int minZ,
+            int maxX, int maxY, int maxZ,
+            int sizeX,
+            int sizeZ
+    ) {
+        double cx = (minX + maxX) / 2.0 + 0.5;
+        double cy = (minY + maxY) / 2.0 + 0.5;
+        double cz = (minZ + maxZ) / 2.0 + 0.5;
+        Location eye = player.getEyeLocation();
+        double dx = eye.getX() - cx;
+        double dz = eye.getZ() - cz;
+
         if (sizeZ == 1) {
-            return dir.getZ() < 0 ? BlockFace.NORTH : BlockFace.SOUTH;
+            // Thin in Z — choose north vs south by where the player stands
+            return dz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
         }
         if (sizeX == 1) {
-            return dir.getX() < 0 ? BlockFace.WEST : BlockFace.EAST;
+            return dx >= 0 ? BlockFace.EAST : BlockFace.WEST;
         }
-        float yaw = player.getLocation().getYaw();
-        yaw = (yaw % 360 + 360) % 360;
-        if (yaw >= 315 || yaw < 45) return BlockFace.SOUTH;
-        if (yaw < 135) return BlockFace.WEST;
-        if (yaw < 225) return BlockFace.NORTH;
-        return BlockFace.EAST;
+        // Fallback: largest horizontal offset
+        if (Math.abs(dz) >= Math.abs(dx)) {
+            return dz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
+        }
+        return dx >= 0 ? BlockFace.EAST : BlockFace.WEST;
     }
 
     public boolean remove(DoomScreen screen) {

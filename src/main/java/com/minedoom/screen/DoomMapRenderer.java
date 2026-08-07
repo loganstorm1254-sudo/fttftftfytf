@@ -2,13 +2,16 @@ package com.minedoom.screen;
 
 import org.bukkit.entity.Player;
 import org.bukkit.map.MapCanvas;
+import org.bukkit.map.MapPalette;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Renders one 128x128 tile of the scaled DOOM framebuffer onto a map.
+ * Non-contextual so everyone looking at the item-frame screen can see it.
  */
+@SuppressWarnings("deprecation")
 public final class DoomMapRenderer extends MapRenderer {
 
     private final DoomScreen screen;
@@ -19,11 +22,16 @@ public final class DoomMapRenderer extends MapRenderer {
     private volatile boolean dirty = true;
 
     public DoomMapRenderer(DoomScreen screen, int tileX, int tileY, MapColorCache colorCache) {
-        super(true);
+        super(false); // MUST be non-contextual or item-frame viewers see nothing
         this.screen = screen;
         this.tileX = tileX;
         this.tileY = tileY;
         this.colorCache = colorCache;
+        // Fill with dark gray so the panel is visible before the first Doom frame
+        byte fill = MapPalette.matchColor(20, 20, 20);
+        for (int i = 0; i < pixels.length; i++) {
+            pixels[i] = fill;
+        }
     }
 
     public void updateFromDoom(byte[] doomRgb, int doomW, int doomH) {
@@ -34,7 +42,6 @@ public final class DoomMapRenderer extends MapRenderer {
 
         for (int ly = 0; ly < 128; ly++) {
             int sy = baseY + ly;
-            // DOOM framebuffer is bottom-up in some ports; PureDOOM RGB is top-down like SDL example
             int srcY = (int) ((long) sy * doomH / screenH);
             if (srcY < 0) srcY = 0;
             if (srcY >= doomH) srcY = doomH - 1;

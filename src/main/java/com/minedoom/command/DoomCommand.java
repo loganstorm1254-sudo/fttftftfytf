@@ -64,8 +64,8 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
                     DoomScreen screen = screens.placeFromSelection(player);
                     engine.ensureStarted();
                     player.sendMessage("§aDoom screen placed §7(" + screen.getTilesX() + "x" + screen.getTilesY()
-                            + " maps, " + screen.getPixelWidth() + "x" + screen.getPixelHeight() + " px)");
-                    player.sendMessage("§7Stand in front and run §a/doom play");
+                            + " maps, face §f" + screen.getFacing() + "§7)");
+                    player.sendMessage("§7Stand on that side of the wall and run §a/doom play");
                 } catch (Exception e) {
                     player.sendMessage("§c" + e.getMessage());
                 }
