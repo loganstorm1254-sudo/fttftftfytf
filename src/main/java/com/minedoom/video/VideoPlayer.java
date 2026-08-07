@@ -11,33 +11,46 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.io.BufferedInputStream;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HexFormat;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Plays real video onto a Google map screen (ffmpeg RGB frames) with synced OGG audio
- * via a temporary resource pack.
+ * Real video on map screens: ffmpeg RGB frames + optional OGG audio via resource pack.
+ * Video starts immediately; audio attaches when/if the pack loads (never blocks on preview).
  */
 public final class VideoPlayer implements Listener {
+
+    private static final Pattern ARCHIVE_DETAILS = Pattern.compile(
+            "archive\\.org/details/([^/?#]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern META_FILE = Pattern.compile(
+            "\"name\"\\s*:\\s*\"([^\"]+\\.(?:mp4|webm|ogv|mkv))\"", Pattern.CASE_INSENSITIVE);
 
     private final MineDoomPlugin plugin;
     private final ScreenManager screens;
     private final FfmpegLocator ffmpeg;
     private final AudioPackService packs;
     private final GoogleBrowser browser;
+    private final HttpClient http = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .connectTimeout(Duration.ofSeconds(20))
+            .build();
 
     private final AtomicBoolean busy = new AtomicBoolean(false);
     private volatile Session session;
-    private final Map<UUID, Boolean> packReady = new ConcurrentHashMap<>();
 
     public VideoPlayer(
             MineDoomPlugin plugin,
@@ -64,14 +77,17 @@ public final class VideoPlayer implements Listener {
         if (s != null) {
             s.stop();
         }
-        packReady.clear();
     }
 
     public void play(Player starter, DoomScreen screen, String rawUrl) {
         if (!busy.compareAndSet(false, true)) {
-            starter.sendMessage("§cAlready playing a video. §7/google stop first.");
-            return;
+            stop();
+            if (!busy.compareAndSet(false, true)) {
+                starter.sendMessage("§cCould not stop the previous video. Try again.");
+                return;
+            }
         }
+
         String url;
         try {
             url = browser.normalizeUrl(rawUrl);
@@ -81,54 +97,141 @@ public final class VideoPlayer implements Listener {
             return;
         }
 
-        starter.sendMessage("§ePreparing video… §7(download + audio pack, may take a bit)");
+        // Show loading on the wall immediately (not a fake player card)
+        paintStatus(screen, "Loading video…", url);
+        starter.sendMessage("§e▶ Starting real playback…");
+
+        int maxW = plugin.getConfig().getInt("video.max-width", 512);
+        int fps = plugin.getConfig().getInt("video.fps", 12);
+        int outW = Math.min(screen.getPixelWidth(), maxW);
+        int outH = Math.max(64, outW * screen.getPixelHeight() / Math.max(1, screen.getPixelWidth()));
+        outH = Math.min(outH, screen.getPixelHeight());
+
+        Session s = new Session(starter.getUniqueId(), screen.getId(), url, outW, outH, fps);
+        session = s;
+
+        // 1) Resolve + start video frames ASAP (do not wait for audio pack)
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 if (!ffmpeg.available()) {
-                    throw new IllegalStateException("ffmpeg unavailable");
+                    throw new IllegalStateException("ffmpeg unavailable — check server logs / video.ffmpeg-path");
                 }
-                Path work = plugin.getDataFolder().toPath().resolve("video");
-                Files.createDirectories(work);
-                String id = "v" + Integer.toHexString(url.hashCode() & 0x7fffffff);
-
-                // Extract audio first (needed for resource pack)
-                Path ogg = work.resolve(id + ".ogg");
-                boolean hasAudio = extractAudio(url, ogg);
-                final AudioPackService.Pack pack = hasAudio ? packs.buildAndHost(ogg, id) : null;
-
-                int maxW = plugin.getConfig().getInt("video.max-width", 512);
-                int fps = plugin.getConfig().getInt("video.fps", 12);
-                int outW = Math.min(screen.getPixelWidth(), maxW);
-                // keep aspect roughly matching the screen
-                int outH = Math.max(64, outW * screen.getPixelHeight() / Math.max(1, screen.getPixelWidth()));
-                outH = Math.min(outH, screen.getPixelHeight());
-
-                Session s = new Session(starter.getUniqueId(), screen.getId(), url, outW, outH, fps, pack);
-                session = s;
-
+                String playUrl = resolvePlayableUrl(url);
+                s.url = playUrl;
+                plugin.getLogger().info("Video play URL: " + playUrl);
+                Bukkit.getScheduler().runTask(plugin, () -> startVideoFrames(s));
+            } catch (Exception e) {
+                plugin.getLogger().warning("Video start failed: " + e.getMessage());
                 Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (pack != null) {
-                        starter.sendMessage("§aAudio pack ready — accept the resource pack prompt for sound.");
-                        starter.sendMessage("§7Video starts when the pack loads (or shortly without sound).");
-                        offerPackToNearby(screen, pack);
-                        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                            if (session == s && !s.started.get()) {
-                                startPlayback(s, false);
-                            }
-                        }, 20L * plugin.getConfig().getInt("video.pack-wait-seconds", 8));
-                    } else {
-                        starter.sendMessage("§eNo audio track — playing video silently.");
-                        startPlayback(s, false);
+                    if (session == s) {
+                        stop();
+                        paintStatus(screen, "Video failed", e.getMessage());
+                        starter.sendMessage("§cVideo failed: §7" + e.getMessage());
                     }
                 });
-            } catch (Exception e) {
-                busy.set(false);
-                session = null;
-                plugin.getLogger().warning("Video prepare failed: " + e.getMessage());
-                Bukkit.getScheduler().runTask(plugin, () ->
-                        starter.sendMessage("§cVideo failed: §7" + e.getMessage()));
             }
         });
+
+        // 2) Audio pack in parallel — never blocks video
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> prepareAudio(s, starter, screen));
+    }
+
+    private void prepareAudio(Session s, Player starter, DoomScreen screen) {
+        try {
+            Path work = plugin.getDataFolder().toPath().resolve("video");
+            Files.createDirectories(work);
+            String id = "v" + Integer.toHexString(s.url.hashCode() & 0x7fffffff);
+            Path ogg = work.resolve(id + ".ogg");
+            if (!extractAudio(s.url, ogg)) {
+                Bukkit.getScheduler().runTask(plugin, () ->
+                        starter.sendMessage("§7No audio track (or extract failed) — video is silent."));
+                return;
+            }
+            AudioPackService.Pack pack = packs.buildAndHost(ogg, id);
+            s.pack = pack;
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (session != s) {
+                    return;
+                }
+                starter.sendMessage("§aSound pack ready — §eaccept the resource pack§a for audio.");
+                offerPackToNearby(screen, pack);
+                // If video already running, try playing sound now for anyone who already has packs off
+                // (real sound starts on SUCCESSFULLY_LOADED)
+            });
+        } catch (Exception e) {
+            plugin.getLogger().warning("Audio pack failed (video still plays silent): " + e.getMessage());
+            Bukkit.getScheduler().runTask(plugin, () ->
+                    starter.sendMessage("§7Audio unavailable (§f" + e.getMessage() + "§7) — video still playing."));
+        }
+    }
+
+    private String resolvePlayableUrl(String url) throws Exception {
+        Matcher m = ARCHIVE_DETAILS.matcher(url);
+        if (m.find()) {
+            String id = m.group(1);
+            String metaUrl = "https://archive.org/metadata/" + id;
+            HttpRequest req = HttpRequest.newBuilder(URI.create(metaUrl))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("User-Agent", "MineDoom/1.0")
+                    .GET()
+                    .build();
+            HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (res.statusCode() < 400) {
+                String best = pickArchiveFile(res.body());
+                if (best != null) {
+                    return "https://archive.org/download/" + id + "/" + best;
+                }
+            }
+            // ffmpeg can often open the details page / derivative playlist
+            return "https://archive.org/download/" + id + "/" + id + ".mp4";
+        }
+        return url;
+    }
+
+    private static String pickArchiveFile(String json) {
+        String bestMp4 = null;
+        int bestScore = -1;
+        Matcher m = META_FILE.matcher(json);
+        while (m.find()) {
+            String name = m.group(1);
+            String lower = name.toLowerCase();
+            if (lower.contains("thumb") || lower.contains("sprite")) {
+                continue;
+            }
+            int score = 0;
+            if (lower.endsWith(".mp4")) score += 10;
+            if (lower.endsWith(".webm")) score += 8;
+            if (lower.endsWith(".ogv")) score += 6;
+            if (lower.contains("1080")) score += 3;
+            if (lower.contains("720")) score += 2;
+            if (lower.contains("480")) score += 1;
+            if (score > bestScore) {
+                bestScore = score;
+                bestMp4 = name;
+            }
+        }
+        return bestMp4;
+    }
+
+    private void startVideoFrames(Session s) {
+        if (session != s) {
+            return;
+        }
+        DoomScreen screen = screens.get(s.screenId).orElse(null);
+        if (screen == null || screen.isHidden()) {
+            stop();
+            return;
+        }
+        if (!s.framesStarted.compareAndSet(false, true)) {
+            return;
+        }
+        Player starter = Bukkit.getPlayer(s.starterId);
+        if (starter != null) {
+            starter.sendMessage("§a▶ Video playing on the wall §7· /google stop to end");
+        }
+        s.decodeThread = new Thread(() -> decodeLoop(s), "MineDoom-Video");
+        s.decodeThread.setDaemon(true);
+        s.decodeThread.start();
     }
 
     private void offerPackToNearby(DoomScreen screen, AudioPackService.Pack pack) {
@@ -138,7 +241,7 @@ public final class VideoPlayer implements Listener {
         }
         Location center = screen.getCenter(world);
         byte[] hash = HexFormat.of().parseHex(pack.sha1Hex());
-        String prompt = "MineDoom video audio — required for sound";
+        String prompt = "MineDoom video sound — accept for audio";
         for (Player p : world.getPlayers()) {
             if (p.getLocation().distanceSquared(center) <= 64 * 64) {
                 try {
@@ -155,66 +258,40 @@ public final class VideoPlayer implements Listener {
     @EventHandler
     public void onPack(PlayerResourcePackStatusEvent event) {
         Session s = session;
-        if (s == null) {
+        if (s == null || s.pack == null) {
             return;
         }
-        PlayerResourcePackStatusEvent.Status st = event.getStatus();
-        if (st == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED
-                || st == PlayerResourcePackStatusEvent.Status.ACCEPTED) {
-            packReady.put(event.getPlayer().getUniqueId(), true);
-            if (st == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED && !s.started.get()) {
-                // Start as soon as the requesting player (or anyone nearby) loads the pack
-                startPlayback(s, true);
-            }
+        if (event.getStatus() == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED) {
+            playSoundFor(event.getPlayer(), s);
+            event.getPlayer().sendMessage("§aSound enabled for video.");
         }
     }
 
-    private synchronized void startPlayback(Session s, boolean withSoundIntent) {
-        if (!s.started.compareAndSet(false, true)) {
-            return;
-        }
-        if (session != s) {
+    private void playSoundFor(Player p, Session s) {
+        if (s.pack == null) {
             return;
         }
         DoomScreen screen = screens.get(s.screenId).orElse(null);
-        if (screen == null || screen.isHidden()) {
-            stop();
+        if (screen == null) {
             return;
         }
-
-        Player starter = Bukkit.getPlayer(s.starterId);
-        if (starter != null) {
-            starter.sendMessage("§a▶ Playing video"
-                    + (withSoundIntent ? " §7(with sound)" : " §8(no pack — silent)")
-                    + " §7· /google stop to end");
+        var world = Bukkit.getWorld(screen.getWorldName());
+        if (world == null) {
+            return;
         }
-
-        // Play audio for everyone nearby if we have a pack
-        if (s.pack != null) {
-            var world = Bukkit.getWorld(screen.getWorldName());
-            if (world != null) {
-                Location center = screen.getCenter(world);
-                float vol = (float) plugin.getConfig().getDouble("video.volume", 1.0);
-                for (Player p : world.getPlayers()) {
-                    if (p.getLocation().distanceSquared(center) > 64 * 64) {
-                        continue;
-                    }
-                    try {
-                        p.playSound(center, s.pack.soundKey(), SoundCategory.RECORDS, vol, 1f);
-                        p.playSound(center, "minecraft:" + s.pack.soundKey(), SoundCategory.RECORDS, vol, 1f);
-                    } catch (Exception e) {
-                        plugin.getLogger().warning("playSound failed: " + e.getMessage());
-                    }
-                }
-            }
+        Location center = screen.getCenter(world);
+        float vol = (float) plugin.getConfig().getDouble("video.volume", 1.0);
+        try {
+            p.stopSound(s.pack.soundKey(), SoundCategory.RECORDS);
+            p.stopSound("minecraft:" + s.pack.soundKey(), SoundCategory.RECORDS);
+            p.playSound(center, s.pack.soundKey(), SoundCategory.RECORDS, vol, 1f);
+            p.playSound(center, "minecraft:" + s.pack.soundKey(), SoundCategory.RECORDS, vol, 1f);
+        } catch (Exception e) {
+            plugin.getLogger().warning("playSound failed: " + e.getMessage());
         }
-
-        s.decodeThread = new Thread(() -> decodeLoop(s, screen), "MineDoom-Video");
-        s.decodeThread.setDaemon(true);
-        s.decodeThread.start();
     }
 
-    private void decodeLoop(Session s, DoomScreen screen) {
+    private void decodeLoop(Session s) {
         Process proc = null;
         try {
             Path ff = ffmpeg.ffmpeg();
@@ -231,26 +308,41 @@ public final class VideoPlayer implements Listener {
                     "-pix_fmt", "rgb24",
                     "pipe:1"
             );
-            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            pb.redirectError(ProcessBuilder.Redirect.PIPE);
             proc = pb.start();
             s.process = proc;
+
+            // Drain stderr so ffmpeg can't block
+            Process finalProc = proc;
+            Thread errDrain = new Thread(() -> {
+                try (InputStream err = finalProc.getErrorStream()) {
+                    err.readAllBytes();
+                } catch (Exception ignored) {
+                }
+            }, "MineDoom-Video-err");
+            errDrain.setDaemon(true);
+            errDrain.start();
 
             int frameBytes = s.width * s.height * 3;
             byte[] buf = new byte[frameBytes];
             InputStream in = new BufferedInputStream(proc.getInputStream(), frameBytes * 2);
             long frameIntervalNs = 1_000_000_000L / Math.max(1, s.fps);
             long next = System.nanoTime();
+            int frames = 0;
 
             while (session == s && !Thread.currentThread().isInterrupted()) {
                 int read = 0;
                 while (read < frameBytes) {
                     int n = in.read(buf, read, frameBytes - read);
                     if (n < 0) {
-                        finish(s, "§aVideo finished.");
+                        finish(s, frames == 0
+                                ? "§cVideo ended with no frames — URL may be blocked or not a video file."
+                                : "§aVideo finished.");
                         return;
                     }
                     read += n;
                 }
+                frames++;
                 byte[] frame = buf.clone();
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (session != s) {
@@ -298,7 +390,20 @@ public final class VideoPlayer implements Listener {
         });
     }
 
-    /** @return true if an ogg with audio was written */
+    private void paintStatus(DoomScreen screen, String title, String detail) {
+        try {
+            int w = screen.getPixelWidth();
+            int h = screen.getPixelHeight();
+            byte[] rgb = browser.renderOfflineHome(w, h, title + " — " + (detail == null ? "" : detail));
+            screens.pushImage(screen, rgb, w, h);
+            var world = Bukkit.getWorld(screen.getWorldName());
+            if (world != null) {
+                screens.broadcastMaps(screen, screen.getCenter(world), 64);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     private boolean extractAudio(String url, Path ogg) throws Exception {
         Files.deleteIfExists(ogg);
         ProcessBuilder pb = new ProcessBuilder(
@@ -320,7 +425,6 @@ public final class VideoPlayer implements Listener {
                 java.util.concurrent.TimeUnit.SECONDS);
         if (!ok) {
             p.destroyForcibly();
-            plugin.getLogger().warning("Audio extract timed out");
             return false;
         }
         return p.exitValue() == 0 && Files.exists(ogg) && Files.size(ogg) > 500;
@@ -329,28 +433,26 @@ public final class VideoPlayer implements Listener {
     private static final class Session {
         final UUID starterId;
         final UUID screenId;
-        final String url;
+        volatile String url;
         final int width;
         final int height;
         final int fps;
-        final AudioPackService.Pack pack; // nullable
-        final AtomicBoolean started = new AtomicBoolean(false);
+        volatile AudioPackService.Pack pack;
+        final AtomicBoolean framesStarted = new AtomicBoolean(false);
         volatile Process process;
         volatile Thread decodeThread;
         int broadcastTick;
 
-        Session(UUID starterId, UUID screenId, String url, int w, int h, int fps, AudioPackService.Pack pack) {
+        Session(UUID starterId, UUID screenId, String url, int w, int h, int fps) {
             this.starterId = starterId;
             this.screenId = screenId;
             this.url = url;
             this.width = w;
             this.height = h;
             this.fps = fps;
-            this.pack = pack;
         }
 
         void stop() {
-            started.set(true);
             if (decodeThread != null) {
                 decodeThread.interrupt();
             }

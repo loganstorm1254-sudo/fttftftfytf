@@ -120,7 +120,8 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cBad URL: §7" + e.getMessage());
                     return true;
                 }
-                if (GoogleBrowser.looksLikeDirectMedia(url)) {
+                // Any media / archive.org link → real player, never screenshot preview
+                if (GoogleBrowser.looksLikeDirectMedia(url) || url.toLowerCase(Locale.ROOT).contains("archive.org/")) {
                     video.play(player, screen.get(), url);
                 } else {
                     loadUrl(player, screen.get(), url, truncateLabel(url));
@@ -134,14 +135,14 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                 }
                 String url = resolveUrlArg(player, args);
                 if (url == null) {
-                    // fall back to last browser url if it looks like media
                     url = browser.getCurrentUrl();
-                    if (!GoogleBrowser.looksLikeDirectMedia(url)) {
+                    if (url == null || url.isBlank() || url.contains("google.com")) {
                         player.sendMessage("§cUsage: /google play <video-url>");
                         player.sendMessage("§7Long links: put URL in a written book, hold it, §a/google play");
                         return true;
                     }
                 }
+                // Always real playback — never a preview image
                 video.play(player, screen.get(), url);
             }
             case "stop", "pause" -> {

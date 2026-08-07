@@ -114,8 +114,10 @@ public final class GoogleBrowser {
             lastQuery = query;
             return renderSearch(query, outW, outH);
         }
-        if (looksLikeDirectMedia(lower)) {
-            return renderDirectMedia(url, outW, outH);
+        // Media URLs should be played via VideoPlayer — if we get here, show a clear message
+        if (looksLikeDirectMedia(lower) || lower.contains("archive.org/")) {
+            return renderMessagePage(outW, outH, "Google",
+                    "Use /google play to watch this video on the wall (not a preview).");
         }
         return renderExternalPage(url, outW, outH);
     }
@@ -336,58 +338,6 @@ public final class GoogleBrowser {
         g.setColor(new Color(189, 193, 198));
         g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(10, outH / 24)));
         drawWrappedReturn(g, desc, 16, y, outW - 32, Math.max(10, outH / 24));
-        g.dispose();
-        return scaleToRgb(img, outW, outH);
-    }
-
-    /** Direct .mp4 / CloudFront file links — can't play video on maps; show a player card + try screenshot. */
-    private byte[] renderDirectMedia(String url, int outW, int outH) throws IOException, InterruptedException {
-        BufferedImage shot = fetchRemoteScreenshot(url, Math.max(640, Math.min(1280, outW * 2)));
-        if (shot != null) {
-            return composeBrowserView(url, shot, outW, outH, "Video file");
-        }
-
-        BufferedImage img = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = img.createGraphics();
-        enableNice(g);
-        g.setColor(new Color(15, 15, 15));
-        g.fillRect(0, 0, outW, outH);
-
-        int barH = Math.max(22, outH / 14);
-        g.setColor(new Color(48, 49, 52));
-        g.fillRect(0, 0, outW, barH);
-        g.setColor(new Color(232, 234, 237));
-        g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(9, barH / 2)));
-        g.drawString(truncate(url, g, outW - 24), 12, barH * 2 / 3);
-
-        // Fake player stage
-        int stagePad = Math.max(16, outW / 20);
-        int stageY = barH + stagePad;
-        int stageH = outH - barH - stagePad * 2 - Math.max(36, outH / 10);
-        g.setColor(new Color(30, 30, 30));
-        g.fillRoundRect(stagePad, stageY, outW - stagePad * 2, stageH, 12, 12);
-
-        // Play button
-        int cx = outW / 2;
-        int cy = stageY + stageH / 2;
-        int r = Math.max(28, Math.min(outW, stageH) / 8);
-        g.setColor(new Color(255, 255, 255, 220));
-        g.fillOval(cx - r, cy - r, r * 2, r * 2);
-        g.setColor(new Color(20, 20, 20));
-        int[] xs = {cx - r / 4, cx - r / 4, cx + r / 2};
-        int[] ys = {cy - r / 2, cy + r / 2, cy};
-        g.fillPolygon(xs, ys, 3);
-
-        g.setColor(Color.WHITE);
-        g.setFont(new Font("SansSerif", Font.BOLD, Math.max(14, outH / 18)));
-        String heading = "Video file";
-        int tw = g.getFontMetrics().stringWidth(heading);
-        g.drawString(heading, (outW - tw) / 2, stageY + stageH + Math.max(22, outH / 22));
-
-        g.setColor(new Color(180, 180, 180));
-        g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(10, outH / 28)));
-        String tip = "Maps can't play video — open the archive.org page instead of the .mp4 link";
-        drawWrappedReturn(g, tip, stagePad, stageY + stageH + Math.max(36, outH / 16), outW - stagePad * 2, Math.max(10, outH / 28));
         g.dispose();
         return scaleToRgb(img, outW, outH);
     }
