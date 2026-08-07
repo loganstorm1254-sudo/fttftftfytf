@@ -3,7 +3,7 @@ version: '${version}'
 main: com.minedoom.MineDoomPlugin
 api-version: '1.21'
 authors: [Logan]
-description: Play DOOM on a WorldEdit-placed map screen with keyboard and mouse.
+description: Play DOOM on a WorldEdit-placed map screen, plus separate Google wall screens.
 website: https://github.com/loganstorm1254-sudo/fttftftfytf
 softdepend: [WorldEdit]
 commands:
@@ -11,9 +11,13 @@ commands:
     description: MineDoom — place and play DOOM in Minecraft
     usage: /doom <wand|place|play|stop|remove|help>
     permission: minedoom.use
+  google:
+    description: Place a Google map screen (separate from /doom)
+    usage: /google <wand|place|home|search|go|refresh|remove|help>
+    permission: minedoom.use
 permissions:
   minedoom.use:
-    description: Use MineDoom commands
+    description: Use MineDoom / Google commands
     default: true
   minedoom.admin:
     description: Admin MineDoom commands

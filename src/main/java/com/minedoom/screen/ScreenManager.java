@@ -49,9 +49,16 @@ public final class ScreenManager {
     }
 
     public Optional<DoomScreen> findNearest(Location loc, double maxDist) {
+        return findNearest(loc, maxDist, null);
+    }
+
+    public Optional<DoomScreen> findNearest(Location loc, double maxDist, ScreenKind kind) {
         DoomScreen best = null;
         double bestDist = maxDist * maxDist;
         for (DoomScreen screen : screens.values()) {
+            if (kind != null && screen.getKind() != kind) {
+                continue;
+            }
             if (loc.getWorld() == null || !screen.getWorldName().equals(loc.getWorld().getName())) {
                 continue;
             }
@@ -66,6 +73,10 @@ public final class ScreenManager {
     }
 
     public DoomScreen placeFromSelection(Player player) throws Exception {
+        return placeFromSelection(player, ScreenKind.DOOM);
+    }
+
+    public DoomScreen placeFromSelection(Player player, ScreenKind kind) throws Exception {
         SelectionService.Bounds bounds = selectionService.requireBounds(player);
         int minX = bounds.minX();
         int minY = bounds.minY();
@@ -106,13 +117,17 @@ public final class ScreenManager {
             throw new IllegalStateException("Screen too large (max 64 maps). Try a smaller selection, e.g. 3x2.");
         }
 
-        return buildScreen(player, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tilesX, tilesY);
+        return buildScreen(player, kind, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, facing, tilesX, tilesY);
     }
 
     /**
      * Place a 1×1 screen on the wall face the player is looking at.
      */
     public DoomScreen placeOnTargetBlock(Player player) throws Exception {
+        return placeOnTargetBlock(player, ScreenKind.DOOM);
+    }
+
+    public DoomScreen placeOnTargetBlock(Player player, ScreenKind kind) throws Exception {
         var hit = player.rayTraceBlocks(8);
         if (hit == null || hit.getHitBlock() == null || hit.getHitBlockFace() == null) {
             throw new IllegalStateException("Look at a solid wall within 8 blocks, then /doom here");
@@ -128,6 +143,7 @@ public final class ScreenManager {
         }
         return buildScreen(
                 player,
+                kind,
                 wall.getX(), wall.getY(), wall.getZ(),
                 wall.getX(), wall.getY(), wall.getZ(),
                 1, 1,
@@ -138,13 +154,19 @@ public final class ScreenManager {
 
     private DoomScreen buildScreen(
             Player player,
+            ScreenKind kind,
             int minX, int minY, int minZ,
             int maxX, int maxY, int maxZ,
             int sizeX, int sizeZ,
             BlockFace facing,
             int tilesX, int tilesY
     ) throws Exception {
-        plugin.getEngine().ensureStarted();
+        if (kind == ScreenKind.DOOM) {
+            if (plugin.getEngine() == null) {
+                throw new IllegalStateException("PureDOOM is not available on this server.");
+            }
+            plugin.getEngine().ensureStarted();
+        }
 
         World world = player.getWorld();
 
@@ -168,6 +190,7 @@ public final class ScreenManager {
         List<UUID> frameIds = new ArrayList<>();
         java.util.Set<String> usedBlocks = new java.util.HashSet<>();
         List<org.bukkit.entity.ItemFrame> frames = new ArrayList<>();
+        String mapLabel = kind == ScreenKind.GOOGLE ? "§eGoogle" : "§cMineDoom";
 
         // 1) Spawn every frame first (sky→teleport trick), no maps yet
         for (int ty = 0; ty < tilesY; ty++) {
@@ -203,7 +226,7 @@ public final class ScreenManager {
             ItemStack mapItem = new ItemStack(Material.FILLED_MAP);
             MapMeta meta = (MapMeta) mapItem.getItemMeta();
             meta.setMapView(view);
-            meta.setDisplayName("§cMineDoom");
+            meta.setDisplayName(mapLabel);
             mapItem.setItemMeta(meta);
             frame.setItem(mapItem, false);
             player.sendMap(view);
@@ -216,6 +239,7 @@ public final class ScreenManager {
 
         DoomScreen screen = new DoomScreen(
                 UUID.randomUUID(),
+                kind,
                 world.getName(),
                 minX, minY, minZ,
                 maxX, maxY, maxZ,
@@ -229,22 +253,34 @@ public final class ScreenManager {
         screens.put(screen.getId(), screen);
         save();
 
-        byte[] placeholder = new byte[plugin.getEngine().getWidth() * plugin.getEngine().getHeight() * 3];
+        int pw = screen.getPixelWidth();
+        int ph = screen.getPixelHeight();
+        byte[] placeholder = new byte[pw * ph * 3];
         for (int i = 0; i < placeholder.length; i += 3) {
-            placeholder[i] = 40;
-            placeholder[i + 1] = 40;
-            placeholder[i + 2] = 48;
+            if (kind == ScreenKind.GOOGLE) {
+                placeholder[i] = (byte) 255;
+                placeholder[i + 1] = (byte) 255;
+                placeholder[i + 2] = (byte) 255;
+            } else {
+                placeholder[i] = 40;
+                placeholder[i + 1] = 40;
+                placeholder[i + 2] = 48;
+            }
         }
-        screen.pushFrame(placeholder, plugin.getEngine().getWidth(), plugin.getEngine().getHeight());
+        screen.pushFrame(placeholder, pw, ph);
         broadcastMaps(screen, player.getLocation(), 48);
 
         player.sendMessage("§7Placed §f" + mapIds.size() + "§7 map frames (" + tilesX + "×" + tilesY
                 + ") facing §f" + facing);
 
-        plugin.getLogger().info("Placed Doom screen " + screen.getId() + " "
+        plugin.getLogger().info("Placed " + kind + " screen " + screen.getId() + " "
                 + tilesX + "x" + tilesY + " facing " + facing + " maps=" + mapIds);
 
         return screen;
+    }
+
+    public void pushImage(DoomScreen screen, byte[] rgb, int w, int h) {
+        screen.pushFrame(rgb, w, h);
     }
 
     public void broadcastMaps(DoomScreen screen, Location around, double radius) {
@@ -333,6 +369,9 @@ public final class ScreenManager {
         // Item frames watch maps themselves; occasional sendMap helps first paint
         boolean send = (broadcastTick % 20) == 0;
         for (DoomScreen screen : screens.values()) {
+            if (screen.getKind() != ScreenKind.DOOM) {
+                continue;
+            }
             screen.pushFrame(rgb, w, h);
             if (send) {
                 World world = Bukkit.getWorld(screen.getWorldName());

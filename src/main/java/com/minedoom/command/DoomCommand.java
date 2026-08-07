@@ -5,6 +5,7 @@ import com.minedoom.doom.DoomEngine;
 import com.minedoom.doom.PureDoomNative;
 import com.minedoom.input.DoomInputListener;
 import com.minedoom.screen.DoomScreen;
+import com.minedoom.screen.ScreenKind;
 import com.minedoom.screen.ScreenManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -61,7 +62,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
             }
             case "place", "create", "screen" -> {
                 try {
-                    DoomScreen screen = screens.placeFromSelection(player);
+                    DoomScreen screen = screens.placeFromSelection(player, ScreenKind.DOOM);
                     engine.ensureStarted();
                     player.sendMessage("§aDoom screen placed §7(" + screen.getTilesX() + "x" + screen.getTilesY()
                             + " · face §f" + screen.getFacing() + "§7)");
@@ -72,7 +73,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
             }
             case "here" -> {
                 try {
-                    DoomScreen screen = screens.placeOnTargetBlock(player);
+                    DoomScreen screen = screens.placeOnTargetBlock(player, ScreenKind.DOOM);
                     engine.ensureStarted();
                     player.sendMessage("§a1×1 Doom screen on the block you're looking at §7(face §f"
                             + screen.getFacing() + "§7)");
@@ -82,7 +83,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
                 }
             }
             case "play", "start" -> {
-                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 16);
+                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 16, ScreenKind.DOOM);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Doom screen nearby. §7Select a wall with the WorldEdit axe and §a/doom place");
                     return true;
@@ -97,9 +98,9 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
                 input.stopPlaying(player);
             }
             case "remove", "delete" -> {
-                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 16);
+                Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 16, ScreenKind.DOOM);
                 if (screen.isEmpty()) {
-                    player.sendMessage("§cNo screen nearby.");
+                    player.sendMessage("§cNo Doom screen nearby.");
                     return true;
                 }
                 if (input.isPlaying(player)) {
@@ -128,7 +129,8 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage("§7Sent ESC");
             }
             case "status" -> {
-                player.sendMessage("§cMineDoom §7screens=" + screens.getScreens().size()
+                long doomScreens = screens.getScreens().stream().filter(s -> s.getKind() == ScreenKind.DOOM).count();
+                player.sendMessage("§cMineDoom §7screens=" + doomScreens
                         + " engine=" + (engine.isRunning() ? "§arunning" : "§8idle")
                         + " §7playing=" + (input.isPlaying(player) ? "§ayes" : "§8no"));
             }

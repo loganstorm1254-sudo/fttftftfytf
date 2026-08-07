@@ -12,11 +12,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A rectangular wall of map displays that shows the DOOM framebuffer.
+ * A rectangular wall of map displays (DOOM framebuffer or Google browser).
  */
 public final class DoomScreen {
 
     private final UUID id;
+    private final ScreenKind kind;
     private final String worldName;
     private final int minX, minY, minZ;
     private final int maxX, maxY, maxZ;
@@ -29,6 +30,7 @@ public final class DoomScreen {
 
     public DoomScreen(
             UUID id,
+            ScreenKind kind,
             String worldName,
             int minX, int minY, int minZ,
             int maxX, int maxY, int maxZ,
@@ -39,6 +41,7 @@ public final class DoomScreen {
             List<UUID> displayIds
     ) {
         this.id = id;
+        this.kind = kind == null ? ScreenKind.DOOM : kind;
         this.worldName = worldName;
         this.minX = minX;
         this.minY = minY;
@@ -55,6 +58,10 @@ public final class DoomScreen {
 
     public UUID getId() {
         return id;
+    }
+
+    public ScreenKind getKind() {
+        return kind;
     }
 
     public String getWorldName() {
@@ -164,6 +171,7 @@ public final class DoomScreen {
 
     public void write(ConfigurationSection section) {
         section.set("id", id.toString());
+        section.set("kind", kind.name());
         section.set("world", worldName);
         section.set("minX", minX);
         section.set("minY", minY);
@@ -195,6 +203,7 @@ public final class DoomScreen {
         }
         return new DoomScreen(
                 UUID.fromString(section.getString("id")),
+                ScreenKind.fromString(section.getString("kind", "DOOM")),
                 section.getString("world"),
                 section.getInt("minX"),
                 section.getInt("minY"),

@@ -12,3 +12,12 @@ mouse-sensitivity: 8.0
 
 # Invert mouse Y (Minecraft pitch)
 invert-mouse-y: false
+
+# Google wall screens (/google) — needs Chrome/Chromium on the server
+google:
+  # Absolute path to chrome binary, or leave blank to auto-detect
+  chrome-path: ""
+  # How long Chrome waits for the page (ms of virtual time)
+  virtual-time-ms: 5000
+  # Kill Chrome if a capture takes longer than this
+  timeout-seconds: 45

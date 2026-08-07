@@ -1,7 +1,9 @@
 package com.minedoom;
 
 import com.minedoom.command.DoomCommand;
+import com.minedoom.command.GoogleCommand;
 import com.minedoom.doom.DoomEngine;
+import com.minedoom.google.GoogleBrowser;
 import com.minedoom.input.DoomInputListener;
 import com.minedoom.input.WandListener;
 import com.minedoom.screen.ScreenManager;
@@ -16,39 +18,56 @@ public final class MineDoomPlugin extends JavaPlugin {
     private DoomEngine engine;
     private ScreenManager screenManager;
     private DoomInputListener inputListener;
+    private GoogleBrowser googleBrowser;
+    private boolean doomAvailable;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
 
         Path data = getDataFolder().toPath();
+        doomAvailable = false;
         try {
             NativeLoader.extractAndLoad(this, data);
+            Path iwad = NativeLoader.ensureIwad(this, data);
+            engine = new DoomEngine(this, iwad);
+            doomAvailable = true;
         } catch (Exception e) {
             getLogger().severe("Failed to load PureDOOM native library: " + e.getMessage());
-            getLogger().severe("MineDoom requires a linux-x86_64 server with glibc.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
+            getLogger().warning("DOOM disabled — Google screens still available via /google");
+            engine = null;
         }
 
-        Path iwad = NativeLoader.ensureIwad(this, data);
-        engine = new DoomEngine(this, iwad);
         SelectionService selectionService = new SelectionService();
         screenManager = new ScreenManager(this, selectionService);
         screenManager.load();
 
-        inputListener = new DoomInputListener(this, engine, screenManager);
-        getServer().getPluginManager().registerEvents(inputListener, this);
+        googleBrowser = new GoogleBrowser(this);
+
         getServer().getPluginManager().registerEvents(new WandListener(selectionService), this);
 
-        DoomCommand cmd = new DoomCommand(this, engine, screenManager, inputListener);
-        var doom = getCommand("doom");
-        if (doom != null) {
-            doom.setExecutor(cmd);
-            doom.setTabCompleter(cmd);
+        if (doomAvailable) {
+            inputListener = new DoomInputListener(this, engine, screenManager);
+            getServer().getPluginManager().registerEvents(inputListener, this);
+
+            DoomCommand cmd = new DoomCommand(this, engine, screenManager, inputListener);
+            var doom = getCommand("doom");
+            if (doom != null) {
+                doom.setExecutor(cmd);
+                doom.setTabCompleter(cmd);
+            }
         }
 
-        getLogger().info("MineDoom enabled — PureDOOM ready. Use /doom help");
+        GoogleCommand googleCmd = new GoogleCommand(this, screenManager, googleBrowser);
+        var google = getCommand("google");
+        if (google != null) {
+            google.setExecutor(googleCmd);
+            google.setTabCompleter(googleCmd);
+        }
+
+        getLogger().info("MineDoom enabled — "
+                + (doomAvailable ? "PureDOOM ready (/doom)" : "DOOM unavailable")
+                + " · Google screens via /google");
     }
 
     @Override
@@ -71,5 +90,13 @@ public final class MineDoomPlugin extends JavaPlugin {
 
     public ScreenManager getScreenManager() {
         return screenManager;
+    }
+
+    public GoogleBrowser getGoogleBrowser() {
+        return googleBrowser;
+    }
+
+    public boolean isDoomAvailable() {
+        return doomAvailable;
     }
 }
