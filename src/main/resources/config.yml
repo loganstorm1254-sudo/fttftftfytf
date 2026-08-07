@@ -20,3 +20,22 @@ switch-range: 48
 google:
   # Kill slow page fetches after this many seconds
   timeout-seconds: 45
+
+# Real video playback (/google play) — needs ffmpeg (auto-downloaded if missing)
+video:
+  fps: 12
+  max-width: 512
+  volume: 1.0
+  pack-wait-seconds: 8
+  prepare-timeout-seconds: 180
+  # Minecraft resource-pack format (1.21.x ≈ 34+)
+  pack-format: 34
+  # Optional absolute path to ffmpeg; leave blank to auto-find / download
+  ffmpeg-path: ""
+  # If uploads are blocked on your host, set these and open the port:
+  # pack-http-port: 8765
+  # pack-public-host: "your.server.ip"
+  pack-http-port: 0
+  pack-public-host: ""
+  # Or host packs yourself and set the public base URL (…/pack-xxx.zip)
+  pack-url: ""

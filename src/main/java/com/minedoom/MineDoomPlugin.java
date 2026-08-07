@@ -12,6 +12,9 @@ import com.minedoom.screen.ControllerStore;
 import com.minedoom.screen.ScreenManager;
 import com.minedoom.screen.SelectionService;
 import com.minedoom.util.NativeLoader;
+import com.minedoom.video.AudioPackService;
+import com.minedoom.video.FfmpegLocator;
+import com.minedoom.video.VideoPlayer;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.nio.file.Path;
@@ -25,6 +28,8 @@ public final class MineDoomPlugin extends JavaPlugin {
     private ControllerItems controllerItems;
     private ControllerStore controllerStore;
     private ControllerListener controllerListener;
+    private FfmpegLocator ffmpegLocator;
+    private VideoPlayer videoPlayer;
     private boolean doomAvailable;
 
     @Override
@@ -56,6 +61,10 @@ public final class MineDoomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(controllerListener, this);
         getServer().getPluginManager().registerEvents(new WandListener(selectionService), this);
 
+        ffmpegLocator = new FfmpegLocator(this);
+        videoPlayer = new VideoPlayer(this, screenManager, ffmpegLocator, new AudioPackService(this), googleBrowser);
+        getServer().getPluginManager().registerEvents(videoPlayer, this);
+
         if (doomAvailable) {
             inputListener = new DoomInputListener(this, engine, screenManager);
             getServer().getPluginManager().registerEvents(inputListener, this);
@@ -68,7 +77,7 @@ public final class MineDoomPlugin extends JavaPlugin {
             }
         }
 
-        GoogleCommand googleCmd = new GoogleCommand(this, screenManager, googleBrowser, controllerListener);
+        GoogleCommand googleCmd = new GoogleCommand(this, screenManager, googleBrowser, controllerListener, videoPlayer);
         var google = getCommand("google");
         if (google != null) {
             google.setExecutor(googleCmd);
@@ -77,11 +86,14 @@ public final class MineDoomPlugin extends JavaPlugin {
 
         getLogger().info("MineDoom enabled — "
                 + (doomAvailable ? "PureDOOM ready (/doom)" : "DOOM unavailable")
-                + " · Google screens via /google · switches via /doom give");
+                + " · Google + video via /google play");
     }
 
     @Override
     public void onDisable() {
+        if (videoPlayer != null) {
+            videoPlayer.stop();
+        }
         if (inputListener != null) {
             inputListener.stopAll();
         }
@@ -119,6 +131,10 @@ public final class MineDoomPlugin extends JavaPlugin {
 
     public ControllerStore getControllerStore() {
         return controllerStore;
+    }
+
+    public VideoPlayer getVideoPlayer() {
+        return videoPlayer;
     }
 
     public boolean isDoomAvailable() {

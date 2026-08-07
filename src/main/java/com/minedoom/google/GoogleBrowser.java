@@ -161,15 +161,20 @@ public final class GoogleBrowser {
         return text.isBlank() ? null : text;
     }
 
-    private static boolean looksLikeDirectMedia(String lowerUrl) {
-        return lowerUrl.contains(".mp4")
-                || lowerUrl.contains(".webm")
-                || lowerUrl.contains(".mkv")
-                || lowerUrl.contains(".mov")
-                || lowerUrl.contains(".m3u8")
-                || lowerUrl.contains(".mp3")
-                || lowerUrl.contains("cloudfront.net/")
-                || lowerUrl.contains("/file/") && (lowerUrl.contains("archive.org") || lowerUrl.contains("download"));
+    public static boolean looksLikeDirectMedia(String lowerUrl) {
+        if (lowerUrl == null) {
+            return false;
+        }
+        String u = lowerUrl.toLowerCase();
+        return u.contains(".mp4")
+                || u.contains(".webm")
+                || u.contains(".mkv")
+                || u.contains(".mov")
+                || u.contains(".m3u8")
+                || u.contains(".mp3")
+                || u.contains("cloudfront.net/")
+                || (u.contains("/download/") && u.contains("archive.org"))
+                || (u.contains("/file/") && u.contains("archive.org"));
     }
 
     public byte[] renderOfflineHome(int outW, int outH, String message) {

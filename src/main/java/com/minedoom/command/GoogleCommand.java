@@ -6,6 +6,7 @@ import com.minedoom.screen.ControllerListener;
 import com.minedoom.screen.DoomScreen;
 import com.minedoom.screen.ScreenKind;
 import com.minedoom.screen.ScreenManager;
+import com.minedoom.video.VideoPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -30,17 +31,20 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
     private final ScreenManager screens;
     private final GoogleBrowser browser;
     private final ControllerListener controllers;
+    private final VideoPlayer video;
 
     public GoogleCommand(
             MineDoomPlugin plugin,
             ScreenManager screens,
             GoogleBrowser browser,
-            ControllerListener controllers
+            ControllerListener controllers,
+            VideoPlayer video
     ) {
         this.plugin = plugin;
         this.screens = screens;
         this.browser = browser;
         this.controllers = controllers;
+        this.video = video;
     }
 
     @Override
@@ -106,25 +110,47 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cNo Google screen nearby.");
                     return true;
                 }
-                String url;
+                String url = resolveUrlArg(player, args);
+                if (url == null) {
+                    return true;
+                }
                 try {
-                    if (args.length >= 2) {
-                        // Join all args — signed video URLs are long and must not be cut at &
-                        url = String.join("", java.util.Arrays.copyOfRange(args, 1, args.length)).trim();
-                    } else {
-                        url = browser.readUrlFromHeldBook(player);
-                        if (url == null) {
-                            player.sendMessage("§cUsage: /google go <url>");
-                            player.sendMessage("§7Long video links break in chat (256 char limit).");
-                            player.sendMessage("§7Put the full URL in a §fwritten book§7, hold it, then §a/google go");
-                            return true;
-                        }
-                    }
                     url = browser.normalizeUrl(url);
-                    loadUrl(player, screen.get(), url, truncateLabel(url));
                 } catch (Exception e) {
                     player.sendMessage("§cBad URL: §7" + e.getMessage());
+                    return true;
                 }
+                if (GoogleBrowser.looksLikeDirectMedia(url)) {
+                    video.play(player, screen.get(), url);
+                } else {
+                    loadUrl(player, screen.get(), url, truncateLabel(url));
+                }
+            }
+            case "play", "watch", "video" -> {
+                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
+                if (screen.isEmpty()) {
+                    player.sendMessage("§cNo Google screen nearby.");
+                    return true;
+                }
+                String url = resolveUrlArg(player, args);
+                if (url == null) {
+                    // fall back to last browser url if it looks like media
+                    url = browser.getCurrentUrl();
+                    if (!GoogleBrowser.looksLikeDirectMedia(url)) {
+                        player.sendMessage("§cUsage: /google play <video-url>");
+                        player.sendMessage("§7Long links: put URL in a written book, hold it, §a/google play");
+                        return true;
+                    }
+                }
+                video.play(player, screen.get(), url);
+            }
+            case "stop", "pause" -> {
+                if (!video.isPlaying()) {
+                    player.sendMessage("§7No video playing.");
+                    return true;
+                }
+                video.stop();
+                player.sendMessage("§7Stopped video.");
             }
             case "refresh", "reload" -> {
                 Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
@@ -135,9 +161,11 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                 loadUrl(player, screen.get(), browser.getCurrentUrl(), "Refresh");
             }
             case "remove", "delete" -> {
+                if (video.isPlaying()) {
+                    video.stop();
+                }
                 Optional<DoomScreen> screen = screens.findNearest(player.getLocation(), 16, ScreenKind.GOOGLE);
                 if (screen.isEmpty()) {
-                    // fall back to any screen
                     screen = screens.findNearest(player.getLocation(), 16);
                 }
                 if (screen.isEmpty()) {
@@ -151,11 +179,27 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
             case "status" -> {
                 long googleScreens = screens.getScreens().stream().filter(s -> s.getKind() == ScreenKind.GOOGLE).count();
                 player.sendMessage("§eGoogle §7screens=" + googleScreens
-                        + " mode=§ahttp §7url=§f" + browser.getCurrentUrl());
+                        + " video=" + (video.isPlaying() ? "§aplaying" : "§8idle")
+                        + " §7url=§f" + truncateLabel(browser.getCurrentUrl()));
             }
             default -> sendHelp(player);
         }
         return true;
+    }
+
+    /** null if usage was printed */
+    private String resolveUrlArg(Player player, String[] args) {
+        if (args.length >= 2) {
+            return String.join("", Arrays.copyOfRange(args, 1, args.length)).trim();
+        }
+        String fromBook = browser.readUrlFromHeldBook(player);
+        if (fromBook != null) {
+            return fromBook;
+        }
+        player.sendMessage("§cUsage: /google " + args[0] + " <url>");
+        player.sendMessage("§7Long video links break in chat (256 char limit).");
+        player.sendMessage("§7Put the full URL in a §fwritten book§7, hold it, then run the command.");
+        return null;
     }
 
     private void loadUrl(Player player, DoomScreen screen, String url, String label) {
@@ -183,22 +227,26 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/google place §7— place a Google map screen");
         player.sendMessage("§e/google home §7— show google.com");
         player.sendMessage("§e/google search <query> §7— search Google");
-        player.sendMessage("§e/google go <url> §7— open a URL");
-        player.sendMessage("§7  long links: put URL in a book, hold it, §e/google go");
-        player.sendMessage("§e/google refresh §7— reload current page");
-        player.sendMessage("§e/google give §7— open switch blocks (lever show/hide)");
-        player.sendMessage("§e/google remove §7— remove nearest Google screen");
-        player.sendMessage("§8No Chrome needed — works on MineKeep / shared hosts.");
+        player.sendMessage("§e/google go <url> §7— open a page (videos auto-play)");
+        player.sendMessage("§e/google play <url> §7— play video + sound on the wall");
+        player.sendMessage("§e/google stop §7— stop video");
+        player.sendMessage("§7  long links: URL in a book → hold → /google play");
+        player.sendMessage("§e/google give §7— switch blocks (lever show/hide)");
+        player.sendMessage("§8Accept the resource-pack prompt for audio.");
     }
 
     private static String truncateLabel(String url) {
+        if (url == null) {
+            return "";
+        }
         return url.length() > 48 ? url.substring(0, 45) + "…" : url;
     }
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            List<String> opts = Arrays.asList("wand", "place", "home", "search", "go", "refresh", "remove", "give", "status", "help");
+            List<String> opts = Arrays.asList(
+                    "wand", "place", "home", "search", "go", "play", "stop", "refresh", "remove", "give", "status", "help");
             String p = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();
             for (String o : opts) {
