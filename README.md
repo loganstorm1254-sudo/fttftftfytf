@@ -1,33 +1,24 @@
-# Chunk Boomerits + Economy + AH + Shop
+# Chunk Boomerits + Economy + AH + Shop + Sell
 
-**Paper / Purpur 1.21.11 — jar `1.6.1`**
+**Paper / Purpur 1.21.11 — jar `1.7.0`**
 
 ## Install
 1. Delete ALL old ChunkBoomerits jars from `plugins/`
-2. Put `dist/ChunkBoomerits-1.6.1.jar` in `plugins/`
+2. Put `dist/ChunkBoomerits-1.7.0.jar` in `plugins/`
 3. **Fully restart** (not `/reload`)
+4. Keep `plugins/ChunkBoomerits/` when updating (shop/AH/economy/sell prices)
 
-## Auction
+## Sell (DonutSMP-style)
 ```
-/ah                 # or /cbah if /ah is taken
-/ah sell <price>    # list item in hand
+/sell            # sell item in hand
+/sell all        # sell all sellable items in inventory
+/sell price      # check fixed price of held item
 ```
+Prices are fixed per material in `plugins/ChunkBoomerits/sell-prices.yml` (same item = same price always).
 
-## Shop
+## Auction / Shop / Economy
 ```
-/shop               # or /cbshop
+/ah  /ah sell <price>
+/shop  /shopadd <price>
+/bal  /pay  /eco  /baltop
 ```
-OP add items (no chat needed):
-```
-# hold a totem, then:
-/shopadd 500
-```
-Or `/sbshovel` → Shop Admin.
-
-## Updating the plugin
-Only replace the **`.jar`** in `plugins/`.  
-Do **not** delete `plugins/ChunkBoomerits/` — that folder holds:
-- `shop.yml` (server shop)
-- `auctions.yml` (AH listings)
-- `economy.yml` (balances)
-- `backups/` (automatic copies on each load)

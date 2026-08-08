@@ -17,10 +17,12 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 public final class MarketCommandIntercept implements Listener {
 	private final AuctionCommands auctionCommands;
 	private final ShopGui shopGui;
+	private final SellCommands sellCommands;
 
-	public MarketCommandIntercept(AuctionCommands auctionCommands, ShopGui shopGui) {
+	public MarketCommandIntercept(AuctionCommands auctionCommands, ShopGui shopGui, SellCommands sellCommands) {
 		this.auctionCommands = auctionCommands;
 		this.shopGui = shopGui;
+		this.sellCommands = sellCommands;
 	}
 
 	@EventHandler(priority = EventPriority.LOWEST)
@@ -62,6 +64,11 @@ public final class MarketCommandIntercept implements Listener {
 		if (label.equals("shopadd") || label.equals("cbshopadd")) {
 			event.setCancelled(true);
 			ShopAddCommand.handle(player, args);
+			return;
+		}
+		if (label.equals("sell") || label.equals("cbsell")) {
+			event.setCancelled(true);
+			sellCommands.handle(player, args);
 		}
 	}
 }

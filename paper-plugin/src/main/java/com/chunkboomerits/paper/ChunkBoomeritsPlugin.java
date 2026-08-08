@@ -14,6 +14,8 @@ import com.chunkboomerits.paper.economy.EconomyService;
 import com.chunkboomerits.paper.economy.MarketCommandIntercept;
 import com.chunkboomerits.paper.economy.ScoreboardEditorGui;
 import com.chunkboomerits.paper.economy.ScoreboardShovelListener;
+import com.chunkboomerits.paper.economy.SellCommands;
+import com.chunkboomerits.paper.economy.SellService;
 import com.chunkboomerits.paper.economy.ShopAddCommand;
 import com.chunkboomerits.paper.economy.ShopAdminGui;
 import com.chunkboomerits.paper.economy.ShopCommands;
@@ -116,6 +118,22 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 			getLogger().info("Registered /shopadd");
 		}
 
+		SellService sellService = new SellService(this);
+		sellService.load();
+		SellCommands sellCmds = new SellCommands(sellService, economy, economyScoreboard);
+		PluginCommand sellCmd = getCommand("sell");
+		if (sellCmd != null) {
+			sellCmd.setExecutor(sellCmds);
+			sellCmd.setTabCompleter(sellCmds);
+			getLogger().info("Registered /sell");
+		}
+		PluginCommand cbsell = getCommand("cbsell");
+		if (cbsell != null) {
+			cbsell.setExecutor(sellCmds);
+			cbsell.setTabCompleter(sellCmds);
+			getLogger().info("Registered /cbsell");
+		}
+
 		ScoreboardEditorGui editorGui = new ScoreboardEditorGui(economyScoreboard);
 		ShopAdminGui shopAdminGui = new ShopAdminGui(shop, economy);
 		AdminHubGui hub = new AdminHubGui(editorGui, shopAdminGui);
@@ -127,7 +145,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getServer().getPluginManager().registerEvents(shopGui, this);
 		getServer().getPluginManager().registerEvents(new ScoreboardShovelListener(hub), this);
 		getServer().getPluginManager().registerEvents(new EconomyListener(economy, economyScoreboard), this);
-		getServer().getPluginManager().registerEvents(new MarketCommandIntercept(auctionCmds, shopGui), this);
+		getServer().getPluginManager().registerEvents(new MarketCommandIntercept(auctionCmds, shopGui, sellCmds), this);
 
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
 		getServer().getPluginManager().registerEvents(new InvincibleHelmetListener(), this);
@@ -138,7 +156,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Market ready: /ah /cbah /shop /cbshop /shopadd — OP shovel: /sbshovel");
+		getLogger().info("Market ready: /sell /ah /shop /shopadd — OP shovel: /sbshovel");
 	}
 
 	@Override

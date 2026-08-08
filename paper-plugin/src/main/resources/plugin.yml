@@ -81,6 +81,10 @@ commands:
     description: OP — add held item to /shop
     usage: /shopadd <price>
     aliases: [cbshopadd]
+  sell:
+    description: Sell items for dollars at fixed prices
+    usage: /sell [hand|all|price]
+    aliases: [cbsell]
 
 permissions:
   chunkboomerits.give:
@@ -119,6 +123,9 @@ permissions:
   chunkboomerits.shop:
     description: Use the server shop
     default: true
+  chunkboomerits.sell:
+    description: Sell items for dollars
+    default: true
   chunkboomerits.*:
     description: All Chunk Boomerits tools
     default: op
@@ -135,3 +142,4 @@ permissions:
       chunkboomerits.economy.eco: true
       chunkboomerits.auction: true
       chunkboomerits.shop: true
+      chunkboomerits.sell: true
