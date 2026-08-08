@@ -83,7 +83,7 @@ commands:
     aliases: [cbshopadd]
   sell:
     description: Sell items for dollars at fixed prices
-    usage: /sell [hand|all|price]
+    usage: /sell [hand|all|price|fill|regenerate|reload]
     aliases: [cbsell]
 
 permissions:

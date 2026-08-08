@@ -60,6 +60,15 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 				player.sendMessage(Component.text("/sell — sell item in hand", NamedTextColor.YELLOW));
 				player.sendMessage(Component.text("/sell all — sell all sellable items in your inventory", NamedTextColor.YELLOW));
 				player.sendMessage(Component.text("/sell price — check the fixed price of your held item", NamedTextColor.YELLOW));
+				if (player.isOp() || player.hasPermission("chunkboomerits.*")) {
+					player.sendMessage(Component.text("/sell fill — add missing item/block prices (OP)", NamedTextColor.YELLOW));
+					player.sendMessage(Component.text("/sell regenerate — rebuild ALL prices (OP, overwrites)", NamedTextColor.YELLOW));
+					player.sendMessage(Component.text("/sell reload — reload sell-prices.yml (OP)", NamedTextColor.YELLOW));
+				}
+				player.sendMessage(Component.text(
+						"Prices: " + sell.allPrices().size() + " items in sell-prices.yml",
+						NamedTextColor.DARK_GRAY
+				));
 				yield true;
 			}
 			case "reload" -> {
@@ -71,8 +80,38 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 				player.sendMessage(Component.text("Reloaded sell-prices.yml (" + sell.allPrices().size() + " items).", NamedTextColor.GREEN));
 				yield true;
 			}
+			case "fill" -> {
+				if (!player.isOp() && !player.hasPermission("chunkboomerits.*")) {
+					player.sendMessage(Component.text("OP only.", NamedTextColor.RED));
+					yield true;
+				}
+				int before = sell.allPrices().size();
+				sell.fillMissing();
+				int after = sell.allPrices().size();
+				player.sendMessage(Component.text(
+						"Added " + (after - before) + " missing prices. Total: " + after,
+						NamedTextColor.GREEN
+				));
+				yield true;
+			}
+			case "regenerate" -> {
+				if (!player.isOp() && !player.hasPermission("chunkboomerits.*")) {
+					player.sendMessage(Component.text("OP only.", NamedTextColor.RED));
+					yield true;
+				}
+				sell.regenerateAll();
+				player.sendMessage(Component.text(
+						"Regenerated ALL sell prices (" + sell.allPrices().size()
+								+ "). Custom prices were overwritten.",
+						NamedTextColor.GOLD
+				));
+				yield true;
+			}
 			default -> {
-				player.sendMessage(Component.text("Usage: /sell [hand|all|price]", NamedTextColor.YELLOW));
+				player.sendMessage(Component.text(
+						"Usage: /sell [hand|all|price|fill|regenerate|reload]",
+						NamedTextColor.YELLOW
+				));
 				yield true;
 			}
 		};
@@ -185,8 +224,12 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 					out.add(s);
 				}
 			}
-			if (sender.isOp() && "reload".startsWith(p)) {
-				out.add("reload");
+			if (sender.isOp() || sender.hasPermission("chunkboomerits.*")) {
+				for (String s : List.of("reload", "fill", "regenerate")) {
+					if (s.startsWith(p)) {
+						out.add(s);
+					}
+				}
 			}
 			return out;
 		}
