@@ -1,10 +1,10 @@
 # Chunk Boomerits + Economy + AH + Shop + Sell
 
-**Paper / Purpur 1.21.11 — jar `1.7.7`**
+**Paper / Purpur 1.21.11 — jar `1.7.8`**
 
 ## Install
 1. Delete ALL old ChunkBoomerits jars from `plugins/`
-2. Put `dist/ChunkBoomerits-1.7.7.jar` in `plugins/`
+2. Put `dist/ChunkBoomerits-1.7.8.jar` in `plugins/`
 3. **Fully restart** (not `/reload`)
 4. Keep `plugins/ChunkBoomerits/` when updating (shop/AH/economy/sell prices)
 
@@ -24,9 +24,10 @@
 /holefiller          # give the wand
 /cbgive holefiller
 ```
-- **Right-click inside a hole/gap** → fills only that cavity up to the surrounding rim (no sky mounds)
-- **Sneak + right-click** → switch **HOLE** ↔ **WALL** mode
-- **Left-click** → undo last fill
+- **Right-click a real pocket / missing wall block** → fills only that gap (copies nearby blocks)
+- Refuses open air, cliff faces, and valleys — will not build mountains
+- **Sneak + right-click** → **HOLE** ↔ **WALL**
+- **Left-click** → undo
 
 ## Auction / Shop / Economy
 ```

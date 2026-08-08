@@ -22,14 +22,14 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * OP Hole Filler wand — fill holes / wall gaps with natural-looking blocks.
+ * OP Hole Filler — fills only real pockets/gaps, never builds cliffs or mountains.
  */
 public final class HoleFillerListener implements Listener {
-	/** Horizontal radius of the pit only — does not fill open sky. */
-	private static final int MAX_RADIUS_HOLE = 10;
-	private static final int MAX_BLOCKS_HOLE = 1500;
-	private static final int MAX_RADIUS_WALL = 8;
-	private static final int MAX_BLOCKS_WALL = 600;
+	/** Small on purpose — this is a gap fixer, not a terraformer. */
+	private static final int MAX_RADIUS_HOLE = 5;
+	private static final int MAX_BLOCKS_HOLE = 200;
+	private static final int MAX_RADIUS_WALL = 4;
+	private static final int MAX_BLOCKS_WALL = 80;
 
 	private final Map<UUID, List<NaturalFiller.UndoBlock>> lastUndo = new HashMap<>();
 
@@ -57,7 +57,6 @@ public final class HoleFillerListener implements Listener {
 			return;
 		}
 
-		// Sneak + right-click: cycle mode
 		if (player.isSneaking() && (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK)) {
 			NaturalFiller.Mode next = OpItems.cycleHoleFillerMode(item);
 			player.sendMessage(Component.text("Hole Filler mode: " + next.name(), NamedTextColor.AQUA));
@@ -65,7 +64,6 @@ public final class HoleFillerListener implements Listener {
 			return;
 		}
 
-		// Left-click: undo last fill
 		if (action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK) {
 			List<NaturalFiller.UndoBlock> undo = lastUndo.remove(player.getUniqueId());
 			if (undo == null || undo.isEmpty()) {
@@ -78,9 +76,8 @@ public final class HoleFillerListener implements Listener {
 			return;
 		}
 
-		// Right-click: fill
 		Block startAir;
-		BlockFace face = event.getBlockFace();
+		BlockFace face = event.getBlockFace() == null ? player.getFacing() : event.getBlockFace();
 		if (action == Action.RIGHT_CLICK_BLOCK && event.getClickedBlock() != null) {
 			Block clicked = event.getClickedBlock();
 			Block adjacent = clicked.getRelative(face);
@@ -92,9 +89,9 @@ public final class HoleFillerListener implements Listener {
 				startAir = findNearbyAir(clicked);
 			}
 		} else {
-			Block target = player.getTargetBlockExact(8);
+			Block target = player.getTargetBlockExact(6);
 			if (target == null) {
-				player.sendMessage(Component.text("Look at a hole or wall gap to fill.", NamedTextColor.RED));
+				player.sendMessage(Component.text("Look at a small hole or wall gap.", NamedTextColor.RED));
 				return;
 			}
 			startAir = target.getType().isAir() ? target : findNearbyAir(target);
@@ -102,28 +99,31 @@ public final class HoleFillerListener implements Listener {
 		}
 
 		if (startAir == null || !startAir.getType().isAir()) {
-			player.sendMessage(Component.text("No air gap found there.", NamedTextColor.RED));
+			player.sendMessage(Component.text("No gap there. Click air inside a hole or missing wall block.", NamedTextColor.RED));
 			return;
 		}
 
 		NaturalFiller.Mode mode = OpItems.holeFillerMode(item);
-		NaturalFiller.Result result = mode == NaturalFiller.Mode.WALL
-				? NaturalFiller.fill(mode, startAir, face, MAX_RADIUS_WALL, MAX_BLOCKS_WALL)
-				: NaturalFiller.fill(mode, startAir, face, MAX_RADIUS_HOLE, MAX_BLOCKS_HOLE);
+		int radius = mode == NaturalFiller.Mode.WALL ? MAX_RADIUS_WALL : MAX_RADIUS_HOLE;
+		int maxBlocks = mode == NaturalFiller.Mode.WALL ? MAX_BLOCKS_WALL : MAX_BLOCKS_HOLE;
+		NaturalFiller.Result result = NaturalFiller.fill(mode, startAir, face, radius, maxBlocks);
 
 		if (result.filled() == 0) {
-			player.sendMessage(Component.text("Nothing to fill.", NamedTextColor.GRAY));
+			player.sendMessage(Component.text(
+					"Not a fillable gap (need a real pocket / missing wall block — won't build cliffs).",
+					NamedTextColor.GRAY
+			));
 			return;
 		}
 
 		lastUndo.put(player.getUniqueId(), result.undo());
 		player.sendMessage(Component.text(
-				"Filled " + result.filled() + " blocks (" + mode.name().toLowerCase() + "). Left-click to undo.",
+				"Filled " + result.filled() + " gap block(s) (" + mode.name().toLowerCase() + "). Left-click undo.",
 				NamedTextColor.GREEN
 		));
-		player.playSound(startAir.getLocation(), Sound.BLOCK_GRASS_PLACE, 0.8f, 0.9f);
+		player.playSound(startAir.getLocation(), Sound.BLOCK_STONE_PLACE, 0.7f, 1.1f);
 		startAir.getWorld().spawnParticle(Particle.CLOUD, startAir.getLocation().add(0.5, 0.5, 0.5),
-				12, 0.6, 0.6, 0.6, 0.01);
+				6, 0.25, 0.25, 0.25, 0.01);
 	}
 
 	private static Block findNearbyAir(Block origin) {

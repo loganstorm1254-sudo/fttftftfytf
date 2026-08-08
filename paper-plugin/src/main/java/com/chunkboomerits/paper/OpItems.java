@@ -256,11 +256,11 @@ public final class OpItems {
 		meta.lore(List.of(
 				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
 				Component.text("Mode: " + mode.name(), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false),
-				Component.text("Right-click gap: fill naturally", NamedTextColor.GRAY)
+				Component.text("Right-click inside a pocket/gap only", NamedTextColor.GRAY)
 						.decoration(TextDecoration.ITALIC, false),
-				Component.text("Sneak + right-click: HOLE ↔ WALL", NamedTextColor.GRAY)
+				Component.text("Won't build cliffs or mountains", NamedTextColor.DARK_GRAY)
 						.decoration(TextDecoration.ITALIC, false),
-				Component.text("Left-click: undo last fill", NamedTextColor.DARK_GRAY)
+				Component.text("Sneak+RMB: HOLE ↔ WALL · LMB: undo", NamedTextColor.DARK_GRAY)
 						.decoration(TextDecoration.ITALIC, false)
 		));
 	}
