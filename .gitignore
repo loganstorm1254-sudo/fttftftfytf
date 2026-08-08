@@ -1,0 +1,12 @@
+.gradle/
+build/
+out/
+.idea/
+*.iml
+*.class
+*.log
+.DS_Store
+native/*.so
+!native/.gitkeep
+hs_err_pid*.log
+replay_pid*.log

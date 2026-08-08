@@ -1,0 +1,9 @@
+MineDoom
+Copyright (c) 2026
+
+This product includes PureDOOM (https://github.com/Daivuk/PureDOOM),
+which contains Doom source code (c) 1993-1996 id Software, Inc.
+Licensed under the GNU General Public License v2.0.
+
+Bundled doom1.wad is the Doom shareware IWAD, redistributable under
+id Software's shareware terms.

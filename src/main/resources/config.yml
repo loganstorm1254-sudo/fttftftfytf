@@ -1,0 +1,49 @@
+# MineDoom configuration
+
+# DOOM internal resolution (higher = sharper but heavier)
+doom-width: 320
+doom-height: 200
+
+# How often to push frames to map screens (ticks). 1 = every tick (~20 FPS display)
+render-interval-ticks: 1
+
+# Mouse look sensitivity when converting Minecraft yaw/pitch to DOOM mouse
+mouse-sensitivity: 8.0
+
+# Invert mouse Y (Minecraft pitch)
+invert-mouse-y: false
+
+# How far a screen switch looks for its matching screen (blocks)
+switch-range: 48
+
+# Display Terminal — type text in the GUI; lever shows it on a 16:9 screen
+display:
+  # Map tile grid (~16:9). 8×5 = 40 maps. Max 64 total.
+  tiles-x: 8
+  tiles-y: 5
+  # How often to refresh live variables like {playercount} (ticks)
+  poll-ticks: 10
+
+# Google wall screens (/google) — HTTP mode, no Chrome install needed
+google:
+  # Kill slow page fetches after this many seconds
+  timeout-seconds: 45
+
+# Real video playback (/google play) — needs ffmpeg (auto-downloaded if missing)
+video:
+  fps: 12
+  max-width: 512
+  volume: 1.0
+  pack-wait-seconds: 8
+  prepare-timeout-seconds: 180
+  # Minecraft resource-pack format (1.21.x ≈ 34+)
+  pack-format: 34
+  # Optional absolute path to ffmpeg; leave blank to auto-find / download
+  ffmpeg-path: ""
+  # If uploads are blocked on your host, set these and open the port:
+  # pack-http-port: 8765
+  # pack-public-host: "your.server.ip"
+  pack-http-port: 0
+  pack-public-host: ""
+  # Or host packs yourself and set the public base URL (…/pack-xxx.zip)
+  pack-url: ""

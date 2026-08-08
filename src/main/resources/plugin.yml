@@ -1,0 +1,24 @@
+name: MineDoom
+version: '${version}'
+main: com.minedoom.MineDoomPlugin
+api-version: '1.21'
+authors: [Logan]
+description: DOOM + Google map screens + Display Terminal (16:9 Python frames).
+website: https://github.com/loganstorm1254-sudo/fttftftfytf
+softdepend: [WorldEdit]
+commands:
+  doom:
+    description: MineDoom — place and play DOOM in Minecraft
+    usage: /doom <wand|place|play|stop|remove|help>
+    permission: minedoom.use
+  google:
+    description: Place a Google map screen (separate from /doom)
+    usage: /google <wand|place|home|search|go|refresh|remove|help>
+    permission: minedoom.use
+permissions:
+  minedoom.use:
+    description: Use MineDoom / Google commands
+    default: true
+  minedoom.admin:
+    description: Admin MineDoom commands
+    default: op
