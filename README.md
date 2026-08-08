@@ -1,10 +1,10 @@
 # Chunk Boomerits + Economy + AH + Shop + Sell
 
-**Paper / Purpur 1.21.11 — jar `1.7.3`**
+**Paper / Purpur 1.21.11 — jar `1.7.4`**
 
 ## Install
 1. Delete ALL old ChunkBoomerits jars from `plugins/`
-2. Put `dist/ChunkBoomerits-1.7.3.jar` in `plugins/`
+2. Put `dist/ChunkBoomerits-1.7.4.jar` in `plugins/`
 3. **Fully restart** (not `/reload`)
 4. Keep `plugins/ChunkBoomerits/` when updating (shop/AH/economy/sell prices)
 
@@ -17,7 +17,9 @@
 /sell regenerate # OP — rebuild ALL prices (overwrites customs)
 /sell reload     # OP — reload sell-prices.yml
 ```
-Mid-tier examples: cobble `$1`, oak log `$5`, sand `$2`, iron `$8`, diamond `$100`, ancient debris `$5,000`, netherite ingot `$25,000`. Jar update auto-upgrades `sell-prices.yml`.
+Mid-tier examples: cobble `$1`, oak log `$5`, sand `$2`, iron `$8`, diamond `$100`, ancient debris `$5,000`.
+
+**OP shovel** (`/sbshovel`): Admin hub → **Sell Prices** — browse/search every item, left-click to set price, right-click reset to default, or edit held item.
 
 ## Auction / Shop / Economy
 ```

@@ -122,6 +122,31 @@ public final class SellService {
 		return prices.get(material);
 	}
 
+	/** OP / shovel: set or change a material's /sell price (0 = not sellable). */
+	public void setPrice(Material material, double price) {
+		if (material == null || isExcluded(material) || !material.isItem()) {
+			return;
+		}
+		prices.put(material, round(Math.max(0, price)));
+		save();
+	}
+
+	/** Reset one material to the built-in default price. */
+	public void resetPrice(Material material) {
+		if (material == null || isExcluded(material) || !material.isItem()) {
+			return;
+		}
+		prices.put(material, computePrice(material));
+		save();
+	}
+
+	public double defaultPriceOf(Material material) {
+		if (material == null || isExcluded(material) || !material.isItem()) {
+			return 0;
+		}
+		return computePrice(material);
+	}
+
 	public double priceOf(ItemStack stack) {
 		if (stack == null || stack.getType().isAir() || !isSellable(stack)) {
 			return 0;

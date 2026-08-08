@@ -124,7 +124,7 @@ public final class OpItems {
 				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
 				Component.text("Right-click: admin hub", NamedTextColor.GRAY)
 						.decoration(TextDecoration.ITALIC, false),
-				Component.text("Scoreboard editor + /shop setup", NamedTextColor.DARK_GRAY)
+				Component.text("Scoreboard · Sell prices · Shop", NamedTextColor.DARK_GRAY)
 						.decoration(TextDecoration.ITALIC, false)
 		));
 		meta.getPersistentDataContainer().set(SCOREBOARD_SHOVEL_KEY, PersistentDataType.BYTE, (byte) 1);

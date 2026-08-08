@@ -7,7 +7,7 @@ import org.bukkit.inventory.InventoryHolder;
  * Marks plugin-owned GUIs so click handlers don't rely on title text alone.
  */
 public final class GuiHolder implements InventoryHolder {
-	public enum Kind { AUCTION, SHOP, SHOP_ADMIN, ADMIN_HUB, SCOREBOARD }
+	public enum Kind { AUCTION, SHOP, SHOP_ADMIN, ADMIN_HUB, SCOREBOARD, SELL_PRICES }
 
 	private final Kind kind;
 	private Inventory inventory;

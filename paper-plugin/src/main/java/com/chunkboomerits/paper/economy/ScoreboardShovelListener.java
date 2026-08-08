@@ -15,7 +15,7 @@ import org.bukkit.inventory.ItemStack;
 import com.chunkboomerits.paper.OpItems;
 
 /**
- * OP shovel opens the admin hub (scoreboard + shop).
+ * OP shovel opens the admin hub (scoreboard + sell prices + shop).
  */
 public final class ScoreboardShovelListener implements Listener {
 	private final AdminHubGui hub;

@@ -15,6 +15,7 @@ import com.chunkboomerits.paper.economy.MarketCommandIntercept;
 import com.chunkboomerits.paper.economy.ScoreboardEditorGui;
 import com.chunkboomerits.paper.economy.ScoreboardShovelListener;
 import com.chunkboomerits.paper.economy.SellCommands;
+import com.chunkboomerits.paper.economy.SellPricesAdminGui;
 import com.chunkboomerits.paper.economy.SellService;
 import com.chunkboomerits.paper.economy.ShopAddCommand;
 import com.chunkboomerits.paper.economy.ShopAdminGui;
@@ -29,6 +30,8 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 	private AuctionService auctions;
 	private ShopService shop;
 	private ShopGui shopGui;
+	private SellService sellService;
+	private AdminHubGui adminHubGui;
 
 	@Override
 	public void onEnable() {
@@ -76,6 +79,9 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 				if (economy != null) {
 					economy.save();
 				}
+				if (sellService != null) {
+					sellService.save();
+				}
 			} catch (Exception ex) {
 				getLogger().warning("Autosave failed: " + ex.getMessage());
 			}
@@ -119,6 +125,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		}
 
 		SellService sellService = new SellService(this);
+		this.sellService = sellService;
 		sellService.load();
 		SellCommands sellCmds = new SellCommands(sellService, economy, economyScoreboard);
 		PluginCommand sellCmd = getCommand("sell");
@@ -135,15 +142,17 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		}
 
 		ScoreboardEditorGui editorGui = new ScoreboardEditorGui(economyScoreboard);
+		SellPricesAdminGui sellPricesGui = new SellPricesAdminGui(sellService, economy);
 		ShopAdminGui shopAdminGui = new ShopAdminGui(shop, economy);
-		AdminHubGui hub = new AdminHubGui(editorGui, shopAdminGui);
+		adminHubGui = new AdminHubGui(editorGui, sellPricesGui, shopAdminGui);
 
 		getServer().getPluginManager().registerEvents(editorGui, this);
+		getServer().getPluginManager().registerEvents(sellPricesGui, this);
 		getServer().getPluginManager().registerEvents(shopAdminGui, this);
-		getServer().getPluginManager().registerEvents(hub, this);
+		getServer().getPluginManager().registerEvents(adminHubGui, this);
 		getServer().getPluginManager().registerEvents(auctionGui, this);
 		getServer().getPluginManager().registerEvents(shopGui, this);
-		getServer().getPluginManager().registerEvents(new ScoreboardShovelListener(hub), this);
+		getServer().getPluginManager().registerEvents(new ScoreboardShovelListener(adminHubGui), this);
 		getServer().getPluginManager().registerEvents(new EconomyListener(economy, economyScoreboard), this);
 		getServer().getPluginManager().registerEvents(new MarketCommandIntercept(auctionCmds, shopGui, sellCmds), this);
 
@@ -156,7 +165,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Market ready: /sell /ah /shop /shopadd — OP shovel: /sbshovel");
+		getLogger().info("Market ready: /sell /ah /shop /shopadd — OP shovel: /sbshovel (sell prices editor)");
 	}
 
 	@Override
@@ -169,6 +178,9 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		}
 		if (shop != null) {
 			shop.save();
+		}
+		if (sellService != null) {
+			sellService.save();
 		}
 		if (economyScoreboard != null) {
 			economyScoreboard.shutdown();
@@ -222,6 +234,14 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 
 	public ShopGui shopGui() {
 		return shopGui;
+	}
+
+	public AdminHubGui adminHubGui() {
+		return adminHubGui;
+	}
+
+	public SellService sellService() {
+		return sellService;
 	}
 
 	public static ChunkBoomeritsPlugin get() {
