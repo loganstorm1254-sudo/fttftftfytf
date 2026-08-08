@@ -25,10 +25,11 @@ import org.bukkit.inventory.ItemStack;
  * OP Hole Filler wand — fill holes / wall gaps with natural-looking blocks.
  */
 public final class HoleFillerListener implements Listener {
-	private static final int MAX_RADIUS_HOLE = 14;
-	private static final int MAX_BLOCKS_HOLE = 2500;
-	private static final int MAX_RADIUS_WALL = 12;
-	private static final int MAX_BLOCKS_WALL = 1200;
+	/** Horizontal radius of the pit only — does not fill open sky. */
+	private static final int MAX_RADIUS_HOLE = 10;
+	private static final int MAX_BLOCKS_HOLE = 1500;
+	private static final int MAX_RADIUS_WALL = 8;
+	private static final int MAX_BLOCKS_WALL = 600;
 
 	private final Map<UUID, List<NaturalFiller.UndoBlock>> lastUndo = new HashMap<>();
 

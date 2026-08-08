@@ -2,6 +2,7 @@ package com.chunkboomerits.paper;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
@@ -18,7 +19,8 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 
 /**
- * Fills holes / wall gaps with materials sampled from nearby blocks so patches look natural.
+ * Fills only the cavity of a hole / wall gap — never open air or sky.
+ * Hole mode finds the surrounding rim height and fills air below it.
  */
 public final class NaturalFiller {
 	public enum Mode {
@@ -34,6 +36,9 @@ public final class NaturalFiller {
 
 	private static final BlockFace[] ALL6 = {
 			BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
+	};
+	private static final BlockFace[] HORIZONTAL = {
+			BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
 	};
 
 	private NaturalFiller() {
@@ -56,7 +61,7 @@ public final class NaturalFiller {
 			return new Result(0, List.of());
 		}
 
-		Map<Material, Integer> palette = samplePalette(world, airs);
+		Map<Material, Integer> palette = samplePalette(world, airs, sx, sy, sz, maxRadius);
 		if (palette.isEmpty()) {
 			palette.put(Material.STONE, 8);
 			palette.put(Material.DIRT, 4);
@@ -72,7 +77,7 @@ public final class NaturalFiller {
 			filled++;
 		}
 
-		// Surface pass — make tops look like real ground
+		// Top of the filled hole → grass/sand/etc. matching surroundings
 		for (Block air : airs) {
 			Block block = world.getBlockAt(air.getX(), air.getY(), air.getZ());
 			Block above = block.getRelative(BlockFace.UP);
@@ -82,7 +87,7 @@ public final class NaturalFiller {
 			Material type = block.getType();
 			if (type == Material.DIRT || type == Material.STONE || type == Material.COARSE_DIRT
 					|| type == Material.GRAVEL || type == Material.ANDESITE || type == Material.DIORITE
-					|| type == Material.GRANITE || type == Material.DEEPSLATE) {
+					|| type == Material.GRANITE || type == Material.DEEPSLATE || type == Material.COBBLESTONE) {
 				Material surface = surfaceFor(palette);
 				if (surface != null) {
 					block.setType(surface, false);
@@ -103,31 +108,59 @@ public final class NaturalFiller {
 		}
 	}
 
+	/**
+	 * Only air inside the pit at/below the surrounding ground rim.
+	 * Open sky above the rim is never filled (that was building the pyramid).
+	 */
 	private static List<Block> collectHoleAir(World world, int sx, int sy, int sz, int maxRadius, int maxBlocks) {
+		int rimY = estimateRimY(world, sx, sy, sz, maxRadius);
+		// Outside the pit, ground is solid at rimY — so air with y <= rimY is the cavity only.
+		int ceiling = rimY;
+		int floor = Math.max(world.getMinHeight(), Math.min(sy, rimY) - Math.min(40, maxRadius * 3));
+
+		// Click must be inside the hole (at or below rim)
+		if (sy > ceiling) {
+			return List.of();
+		}
+
 		List<Block> out = new ArrayList<>();
 		Queue<long[]> q = new ArrayDeque<>();
 		Set<Long> seen = new HashSet<>();
-		long startKey = key(sx, sy, sz);
 		q.add(new long[] {sx, sy, sz});
-		seen.add(startKey);
+		seen.add(key(sx, sy, sz));
 
 		while (!q.isEmpty() && out.size() < maxBlocks) {
 			long[] p = q.poll();
 			int x = (int) p[0];
 			int y = (int) p[1];
 			int z = (int) p[2];
-			if (distSq(x, y, z, sx, sy, sz) > maxRadius * maxRadius) {
+
+			int hDistSq = (x - sx) * (x - sx) + (z - sz) * (z - sz);
+			if (hDistSq > maxRadius * maxRadius) {
 				continue;
 			}
+			if (y < floor || y > ceiling) {
+				continue;
+			}
+
 			Block block = world.getBlockAt(x, y, z);
 			if (!block.getType().isAir()) {
 				continue;
 			}
+
 			out.add(block);
+
 			for (BlockFace face : ALL6) {
 				int nx = x + face.getModX();
 				int ny = y + face.getModY();
 				int nz = z + face.getModZ();
+				if (ny < floor || ny > ceiling) {
+					continue;
+				}
+				int nh = (nx - sx) * (nx - sx) + (nz - sz) * (nz - sz);
+				if (nh > maxRadius * maxRadius) {
+					continue;
+				}
 				long nk = key(nx, ny, nz);
 				if (seen.add(nk)) {
 					q.add(new long[] {nx, ny, nz});
@@ -137,10 +170,87 @@ public final class NaturalFiller {
 		return out;
 	}
 
+	/**
+	 * Rim = typical ground height around the hole (median of ring samples), never the pit floor.
+	 */
+	private static int estimateRimY(World world, int sx, int sy, int sz, int maxRadius) {
+		List<Integer> heights = new ArrayList<>();
+		int scanTop = Math.min(world.getMaxHeight() - 1, sy + 32);
+		int scanBot = Math.max(world.getMinHeight(), sy - 8);
+
+		for (int r = Math.max(2, maxRadius / 3); r <= maxRadius; r++) {
+			for (int i = 0; i < 16; i++) {
+				double ang = (Math.PI * 2 * i) / 16.0;
+				int x = sx + (int) Math.round(Math.cos(ang) * r);
+				int z = sz + (int) Math.round(Math.sin(ang) * r);
+				int surface = topSolidY(world, x, z, scanTop, scanBot);
+				if (surface != Integer.MIN_VALUE && surface >= sy - 1) {
+					heights.add(surface);
+				}
+			}
+		}
+
+		// Also sample a square ring
+		for (int dx = -maxRadius; dx <= maxRadius; dx++) {
+			for (int dz = -maxRadius; dz <= maxRadius; dz++) {
+				int adx = Math.abs(dx);
+				int adz = Math.abs(dz);
+				boolean onRing = (adx == maxRadius || adz == maxRadius)
+						|| (adx == maxRadius - 1 && adz >= maxRadius / 2)
+						|| (adz == maxRadius - 1 && adx >= maxRadius / 2);
+				if (!onRing) {
+					continue;
+				}
+				int surface = topSolidY(world, sx + dx, sz + dz, scanTop, scanBot);
+				if (surface != Integer.MIN_VALUE && surface >= sy - 1) {
+					heights.add(surface);
+				}
+			}
+		}
+
+		if (heights.isEmpty()) {
+			// Fallback: solid neighbors above/beside the click
+			for (BlockFace face : HORIZONTAL) {
+				Block n = world.getBlockAt(sx + face.getModX(), sy, sz + face.getModZ());
+				if (!n.getType().isAir()) {
+					heights.add(n.getY());
+				}
+				Block up = world.getBlockAt(sx + face.getModX(), sy + 1, sz + face.getModZ());
+				if (!up.getType().isAir()) {
+					heights.add(up.getY());
+				}
+			}
+		}
+
+		if (heights.isEmpty()) {
+			return sy;
+		}
+
+		Collections.sort(heights);
+		// Median of surrounding ground — stable rim height
+		int median = heights.get(heights.size() / 2);
+		// Don't use a rim far above the click (avoids filling weird tall areas)
+		return Math.min(median, sy + Math.max(2, maxRadius / 2));
+	}
+
+	/** Highest solid block in column, scanning down from top. */
+	private static int topSolidY(World world, int x, int z, int fromY, int toY) {
+		for (int y = fromY; y >= toY; y--) {
+			Material mat = world.getBlockAt(x, y, z).getType();
+			if (!mat.isAir() && mat.isSolid()) {
+				return y;
+			}
+		}
+		return Integer.MIN_VALUE;
+	}
+
 	private static List<Block> collectWallAir(World world, int sx, int sy, int sz, BlockFace normal,
 			int maxRadius, int maxBlocks) {
-		// Constrain flood mostly to the wall plane (perpendicular to the clicked face)
 		BlockFace n = normal == null ? BlockFace.NORTH : normal;
+		if (n == BlockFace.UP || n == BlockFace.DOWN) {
+			n = BlockFace.NORTH;
+		}
+
 		List<Block> out = new ArrayList<>();
 		Queue<long[]> q = new ArrayDeque<>();
 		Set<Long> seen = new HashSet<>();
@@ -155,25 +265,28 @@ public final class NaturalFiller {
 			if (Math.abs(x - sx) > maxRadius || Math.abs(y - sy) > maxRadius || Math.abs(z - sz) > maxRadius) {
 				continue;
 			}
-			// Keep the fill thin along the normal (wall thickness)
+
 			int along = Math.abs(n.getModX()) * Math.abs(x - sx)
-					+ Math.abs(n.getModZ()) * Math.abs(z - sz)
-					+ (n.getModY() != 0 ? Math.abs(y - sy) : 0);
-			if (along > 2) {
+					+ Math.abs(n.getModZ()) * Math.abs(z - sz);
+			if (along > 1) {
 				continue;
 			}
+
 			Block block = world.getBlockAt(x, y, z);
 			if (!block.getType().isAir()) {
 				continue;
 			}
+
+			// Must be a gap in a wall: solid on at least one side in the wall plane neighborhood
+			if (countSolidNeighbors(world, x, y, z) < 2) {
+				continue;
+			}
+
 			out.add(block);
 
-			// Prefer plane neighbors (slide along wall + up/down)
 			for (BlockFace face : ALL6) {
-				// Allow limited movement into the wall thickness
 				boolean planeMove = (n.getModX() != 0 && face.getModX() == 0)
-						|| (n.getModZ() != 0 && face.getModZ() == 0)
-						|| (n.getModY() != 0 && face.getModY() == 0);
+						|| (n.getModZ() != 0 && face.getModZ() == 0);
 				boolean thinNormal = face == n || face == n.getOppositeFace();
 				if (!planeMove && !thinNormal) {
 					continue;
@@ -190,28 +303,39 @@ public final class NaturalFiller {
 		return out;
 	}
 
-	private static Map<Material, Integer> samplePalette(World world, List<Block> airs) {
+	private static int countSolidNeighbors(World world, int x, int y, int z) {
+		int c = 0;
+		for (BlockFace face : ALL6) {
+			Material mat = world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ()).getType();
+			if (!mat.isAir() && mat.isSolid()) {
+				c++;
+			}
+		}
+		return c;
+	}
+
+	private static Map<Material, Integer> samplePalette(World world, List<Block> airs,
+			int sx, int sy, int sz, int maxRadius) {
 		Map<Material, Integer> counts = new EnumMap<>(Material.class);
-		Set<Long> checked = new HashSet<>();
-		for (Block air : airs) {
-			for (int dx = -2; dx <= 2; dx++) {
-				for (int dy = -2; dy <= 2; dy++) {
-					for (int dz = -2; dz <= 2; dz++) {
-						if (dx == 0 && dy == 0 && dz == 0) {
-							continue;
-						}
-						int x = air.getX() + dx;
-						int y = air.getY() + dy;
-						int z = air.getZ() + dz;
-						long k = key(x, y, z);
-						if (!checked.add(k)) {
-							continue;
-						}
-						Material mat = world.getBlockAt(x, y, z).getType();
-						if (isNaturalFill(mat)) {
-							counts.merge(mat, 1, Integer::sum);
-						}
+		// Prefer sampling the rim / walls around the hole, not distant open terrain
+		for (int dx = -maxRadius; dx <= maxRadius; dx++) {
+			for (int dy = -2; dy <= 4; dy++) {
+				for (int dz = -maxRadius; dz <= maxRadius; dz++) {
+					if (dx * dx + dz * dz > maxRadius * maxRadius) {
+						continue;
 					}
+					Material mat = world.getBlockAt(sx + dx, sy + dy, sz + dz).getType();
+					if (isNaturalFill(mat)) {
+						counts.merge(mat, 1, Integer::sum);
+					}
+				}
+			}
+		}
+		for (Block air : airs) {
+			for (BlockFace face : ALL6) {
+				Material mat = air.getRelative(face).getType();
+				if (isNaturalFill(mat)) {
+					counts.merge(mat, 2, Integer::sum);
 				}
 			}
 		}
@@ -219,30 +343,31 @@ public final class NaturalFiller {
 	}
 
 	private static Material pickNatural(World world, Block air, Map<Material, Integer> palette, Random random) {
-		// Local bias: prefer immediate solid neighbors
 		Map<Material, Integer> local = new EnumMap<>(Material.class);
 		for (BlockFace face : ALL6) {
 			Material mat = air.getRelative(face).getType();
 			if (isNaturalFill(mat)) {
-				local.merge(mat, 3, Integer::sum);
+				local.merge(mat, 4, Integer::sum);
 			}
 		}
 		for (Map.Entry<Material, Integer> e : palette.entrySet()) {
 			local.merge(e.getKey(), e.getValue(), Integer::sum);
 		}
 
-		// Prefer dirt under grass-like tops, stone deeper
 		Block above = air.getRelative(BlockFace.UP);
 		Block below = air.getRelative(BlockFace.DOWN);
 		if (above.getType().isAir() && !below.getType().isAir()) {
-			boost(local, Material.GRASS_BLOCK, 6);
-			boost(local, Material.DIRT, 4);
+			boost(local, Material.GRASS_BLOCK, 8);
+			boost(local, Material.DIRT, 5);
 			boost(local, Material.SAND, 2);
 		} else if (!above.getType().isAir() && above.getType() == Material.GRASS_BLOCK) {
-			boost(local, Material.DIRT, 10);
+			boost(local, Material.DIRT, 12);
 		} else if (air.getY() < world.getMinHeight() + 40) {
 			boost(local, Material.DEEPSLATE, 5);
 			boost(local, Material.STONE, 4);
+		} else {
+			boost(local, Material.STONE, 2);
+			boost(local, Material.DIRT, 2);
 		}
 
 		return weighted(local, random);
@@ -261,7 +386,7 @@ public final class NaturalFiller {
 			return Material.PODZOL;
 		}
 		if (sand > grass + 2) {
-			return palette.containsKey(Material.RED_SAND) && palette.get(Material.RED_SAND) >= palette.getOrDefault(Material.SAND, 0)
+			return palette.getOrDefault(Material.RED_SAND, 0) >= palette.getOrDefault(Material.SAND, 0)
 					? Material.RED_SAND : Material.SAND;
 		}
 		if (grass > 0 || dirt > 0) {
@@ -322,12 +447,5 @@ public final class NaturalFiller {
 
 	private static long key(int x, int y, int z) {
 		return ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | (y & 0xFFF);
-	}
-
-	private static int distSq(int x, int y, int z, int sx, int sy, int sz) {
-		int dx = x - sx;
-		int dy = y - sy;
-		int dz = z - sz;
-		return dx * dx + dy * dy + dz * dz;
 	}
 }
