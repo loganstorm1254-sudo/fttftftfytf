@@ -30,9 +30,9 @@ public final class DisplayItems {
         meta.setDisplayName("§bDisplay Terminal");
         meta.setLore(List.of(
                 "§7Right-click for GUI",
-                "§7Take a §f16:9 Screen§7, place it on a wall",
-                "§7Put a §flever§7 on this block — ON shows the screen",
-                "§7Python: write PNG to §fplugins/MineDoom/display/"
+                "§7Set text → take §f16:9 Screen§7 → place on wall",
+                "§7Lever ON shows your text on the screen",
+                "§7Variables: §f{playercount}§7, §f{maxplayers}§7, §f{time}"
         ));
         meta.getPersistentDataContainer().set(terminalKey, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);

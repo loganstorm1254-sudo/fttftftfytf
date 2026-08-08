@@ -9,7 +9,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Placed Display Terminals and their linked 16:9 screens. */
 public final class DisplayTerminalStore {
 
-    public record Terminal(String world, int x, int y, int z, UUID linkedScreenId) {
+    public static final String DEFAULT_TEXT = "Players online: {playercount}";
+
+    public record Terminal(String world, int x, int y, int z, UUID linkedScreenId, String text) {
         public String key() {
             return world + ":" + x + ":" + y + ":" + z;
         }
@@ -28,7 +29,18 @@ public final class DisplayTerminalStore {
         }
 
         public Terminal withScreen(UUID screenId) {
-            return new Terminal(world, x, y, z, screenId);
+            return new Terminal(world, x, y, z, screenId, text);
+        }
+
+        public Terminal withText(String newText) {
+            return new Terminal(world, x, y, z, linkedScreenId, newText == null ? "" : newText);
+        }
+
+        public String safeText() {
+            if (text == null || text.isBlank()) {
+                return DEFAULT_TEXT;
+            }
+            return text;
         }
     }
 
@@ -56,6 +68,10 @@ public final class DisplayTerminalStore {
         }
         return Optional.ofNullable(terminals.get(
                 loc.getWorld().getName() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":" + loc.getBlockZ()));
+    }
+
+    public Optional<Terminal> getByKey(String key) {
+        return Optional.ofNullable(terminals.get(key));
     }
 
     public Optional<Terminal> remove(Location loc) {
@@ -106,12 +122,14 @@ public final class DisplayTerminalStore {
                 if (sid != null && !sid.isBlank()) {
                     screen = UUID.fromString(sid);
                 }
+                String text = c.getString("text", DEFAULT_TEXT);
                 Terminal t = new Terminal(
                         c.getString("world"),
                         c.getInt("x"),
                         c.getInt("y"),
                         c.getInt("z"),
-                        screen
+                        screen,
+                        text
                 );
                 terminals.put(t.key(), t);
             } catch (Exception e) {
@@ -133,6 +151,7 @@ public final class DisplayTerminalStore {
             if (t.linkedScreenId() != null) {
                 yaml.set(p + ".screen", t.linkedScreenId().toString());
             }
+            yaml.set(p + ".text", t.text() == null ? DEFAULT_TEXT : t.text());
             i++;
         }
         try {

@@ -4,6 +4,8 @@ import com.minedoom.MineDoomPlugin;
 import com.minedoom.screen.DoomScreen;
 import com.minedoom.screen.ScreenKind;
 import com.minedoom.screen.ScreenManager;
+import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
@@ -21,6 +23,7 @@ import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -28,14 +31,16 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Display Terminal GUI + 16:9 screen placement + lever show/hide.
+ * Display Terminal GUI + 16:9 screen placement + lever show/hide + typed text.
  */
 public final class DisplayListener implements Listener {
 
@@ -65,18 +70,23 @@ public final class DisplayListener implements Listener {
     private final ScreenManager screens;
     private final DisplayItems items;
     private final DisplayTerminalStore store;
+    private final DisplayTextRenderer textRenderer;
     private final Map<UUID, Boolean> lastPower = new HashMap<>();
+    /** player UUID → terminal key waiting for chat text */
+    private final Map<UUID, String> pendingText = new ConcurrentHashMap<>();
 
     public DisplayListener(
             MineDoomPlugin plugin,
             ScreenManager screens,
             DisplayItems items,
-            DisplayTerminalStore store
+            DisplayTerminalStore store,
+            DisplayTextRenderer textRenderer
     ) {
         this.plugin = plugin;
         this.screens = screens;
         this.items = items;
         this.store = store;
+        this.textRenderer = textRenderer;
     }
 
     public void openGui(Player player, DisplayTerminalStore.Terminal terminal) {
@@ -84,29 +94,53 @@ public final class DisplayListener implements Listener {
         Inventory inv = Bukkit.createInventory(holder, 27, "Display Terminal");
         holder.setInventory(inv);
 
-        inv.setItem(11, items.screen169());
-        inv.setItem(13, linkButton(terminal));
-        inv.setItem(15, statusButton(terminal));
+        inv.setItem(10, textButton(terminal));
+        inv.setItem(12, items.screen169());
+        inv.setItem(14, linkButton(terminal));
+        inv.setItem(16, statusButton(terminal));
+        inv.setItem(22, tipButton());
 
+        player.openInventory(inv);
+    }
+
+    private ItemStack textButton(DisplayTerminalStore.Terminal terminal) {
+        ItemStack item = new ItemStack(Material.NAME_TAG);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName("§eSet screen text");
+        List<String> lore = new ArrayList<>();
+        lore.add("§7Click, then type in chat.");
+        lore.add("§7Current:");
+        String shown = terminal.safeText();
+        for (String line : wrapLore(shown, 40)) {
+            lore.add("§f" + line);
+        }
+        lore.add("§8");
+        lore.add("§7Preview: §a" + DisplayTextRenderer.applyPlaceholders(shown, terminal.location()));
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack tipButton() {
         ItemStack tip = new ItemStack(Material.PAPER);
         ItemMeta meta = tip.getItemMeta();
         meta.setDisplayName("§eHow to use");
         meta.setLore(List.of(
-                "§71. Take the §f16:9 Screen§7 item",
-                "§72. Look at a wall and place it",
-                "§73. Put a §flever§7 on this terminal",
-                "§74. Lever §aON§7 → screen appears",
-                "§75. Lever §cOFF§7 → screen hides (air)",
+                "§71. Set text (name tag button)",
+                "§72. Take §f16:9 Screen§7 → place on wall",
+                "§73. Lever on terminal §aON§7 = show",
                 "§7",
-                "§bPython display:",
-                "§7Save a PNG to",
-                "§fplugins/MineDoom/display/frame.png",
-                "§7It shows while the lever is ON"
+                "§bVariables (live):",
+                "§f{playercount} §7online players",
+                "§f{maxplayers} §7server max",
+                "§f{world} §7world name",
+                "§f{time} §7HH:mm",
+                "§f{date} §7yyyy-MM-dd",
+                "§f{tps} §7server TPS",
+                "§7Use §f|§7 for a new line"
         ));
         tip.setItemMeta(meta);
-        inv.setItem(22, tip);
-
-        player.openInventory(inv);
+        return tip;
     }
 
     private ItemStack linkButton(DisplayTerminalStore.Terminal terminal) {
@@ -151,6 +185,23 @@ public final class DisplayListener implements Listener {
         return id.toString().substring(0, 8);
     }
 
+    private static List<String> wrapLore(String text, int max) {
+        List<String> out = new ArrayList<>();
+        String flat = text.replace('\n', ' ').replace('|', ' ');
+        while (flat.length() > max) {
+            out.add(flat.substring(0, max));
+            flat = flat.substring(max);
+            if (out.size() >= 4) {
+                out.add(flat.isEmpty() ? "" : flat.substring(0, Math.min(max, flat.length())) + "…");
+                return out;
+            }
+        }
+        if (!flat.isEmpty() || out.isEmpty()) {
+            out.add(flat);
+        }
+        return out;
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         ItemStack hand = event.getItemInHand();
@@ -159,13 +210,11 @@ public final class DisplayListener implements Listener {
         }
         Block b = event.getBlockPlaced();
         store.put(new DisplayTerminalStore.Terminal(
-                b.getWorld().getName(), b.getX(), b.getY(), b.getZ(), null));
-        event.getPlayer().sendMessage("§aDisplay Terminal placed. §7Right-click it for the GUI.");
+                b.getWorld().getName(), b.getX(), b.getY(), b.getZ(), null,
+                DisplayTerminalStore.DEFAULT_TEXT));
+        event.getPlayer().sendMessage("§aDisplay Terminal placed. §7Right-click → Set screen text.");
     }
 
-    /**
-     * Item frames are entities — place via right-click, not BlockPlaceEvent.
-     */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onPlaceScreenItem(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
@@ -189,10 +238,10 @@ public final class DisplayListener implements Listener {
             if (term.isPresent()) {
                 DisplayTerminalStore.Terminal linked = term.get().withScreen(screen.getId());
                 store.put(linked);
-                player.sendMessage("§a16:9 screen placed & linked to terminal §7(" + tx + "×" + ty + ")");
-                player.sendMessage("§7Flick the lever on the terminal §aON§7 to show it.");
+                player.sendMessage("§a16:9 screen placed & linked §7(" + tx + "×" + ty + ")");
+                player.sendMessage("§7Flick the lever §aON§7 to show your text.");
             } else {
-                player.sendMessage("§a16:9 screen placed §7(no terminal nearby — open a terminal GUI → Link)");
+                player.sendMessage("§a16:9 screen placed §7(no terminal nearby — GUI → Link)");
             }
             if (player.getGameMode() != GameMode.CREATIVE) {
                 hand.setAmount(hand.getAmount() - 1);
@@ -229,7 +278,6 @@ public final class DisplayListener implements Listener {
         if (block == null) {
             return;
         }
-        // Screen item placement is handled separately
         if (items.isScreenItem(event.getItem())) {
             return;
         }
@@ -237,7 +285,6 @@ public final class DisplayListener implements Listener {
         if (term.isEmpty()) {
             return;
         }
-        // Don't steal lever placement / lever toggles
         if (event.getItem() != null && event.getItem().getType() == Material.LEVER) {
             return;
         }
@@ -250,7 +297,6 @@ public final class DisplayListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onRedstone(BlockRedstoneEvent event) {
-        // Lever attached to our terminal, or power into the terminal block
         Block block = event.getBlock();
         Optional<DisplayTerminalStore.Terminal> term = Optional.empty();
 
@@ -266,7 +312,6 @@ public final class DisplayListener implements Listener {
             term = store.get(block.getLocation());
         }
         if (term.isEmpty()) {
-            // Check neighbors for terminal receiving power
             for (BlockFace face : new BlockFace[]{BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST, BlockFace.UP, BlockFace.DOWN}) {
                 Optional<DisplayTerminalStore.Terminal> t = store.get(block.getRelative(face).getLocation());
                 if (t.isPresent()) {
@@ -310,19 +355,27 @@ public final class DisplayListener implements Listener {
     }
 
     void applyPower(DisplayTerminalStore.Terminal terminal, Player player) {
-        boolean powered = isPowered(terminal).powered();
-        UUID key = powerKey(terminal);
+        // Always re-fetch latest terminal (text may have changed)
+        Optional<DisplayTerminalStore.Terminal> fresh = store.getByKey(terminal.key());
+        DisplayTerminalStore.Terminal t = fresh.orElse(terminal);
+
+        boolean powered = isPowered(t).powered();
+        UUID key = powerKey(t);
         Boolean prev = lastPower.put(key, powered);
         if (prev != null && prev == powered) {
+            // Still refresh text when already on
+            if (powered) {
+                pushTerminalText(t);
+            }
             return;
         }
-        if (terminal.linkedScreenId() == null) {
+        if (t.linkedScreenId() == null) {
             if (player != null) {
                 player.sendMessage("§cNo screen linked. Open the terminal GUI → Link nearest screen.");
             }
             return;
         }
-        Optional<DoomScreen> screen = screens.get(terminal.linkedScreenId());
+        Optional<DoomScreen> screen = screens.get(t.linkedScreenId());
         if (screen.isEmpty() || screen.get().getKind() != ScreenKind.DISPLAY) {
             if (player != null) {
                 player.sendMessage("§cLinked screen missing. Place a 16:9 screen again.");
@@ -332,8 +385,7 @@ public final class DisplayListener implements Listener {
         try {
             if (powered) {
                 screens.showScreen(screen.get());
-                // push last python frame if any
-                plugin.getDisplayInbox().pushLatest(screen.get());
+                pushTerminalText(t);
                 if (player != null) {
                     player.sendMessage("§aDisplay screen ON");
                 }
@@ -350,6 +402,17 @@ public final class DisplayListener implements Listener {
         }
     }
 
+    void pushTerminalText(DisplayTerminalStore.Terminal terminal) {
+        if (terminal.linkedScreenId() == null) {
+            return;
+        }
+        Optional<DoomScreen> screen = screens.get(terminal.linkedScreenId());
+        if (screen.isEmpty() || screen.get().isHidden()) {
+            return;
+        }
+        textRenderer.pushText(screen.get(), terminal.safeText(), terminal.location());
+    }
+
     @EventHandler
     public void onGuiClick(InventoryClickEvent event) {
         if (!(event.getInventory().getHolder() instanceof TerminalGuiHolder holder)) {
@@ -364,7 +427,15 @@ public final class DisplayListener implements Listener {
             return;
         }
         int slot = event.getRawSlot();
-        if (slot == 11 && items.isScreenItem(clicked)) {
+        if (slot == 10) {
+            player.closeInventory();
+            pendingText.put(player.getUniqueId(), holder.terminal().key());
+            player.sendMessage("§eType the text for the screen in chat.");
+            player.sendMessage("§7Example: §fHello! Players online: {playercount}");
+            player.sendMessage("§7Use §f|§7 for a new line · type §ccancel§7 to abort.");
+            return;
+        }
+        if (slot == 12 && items.isScreenItem(clicked)) {
             HashMap<Integer, ItemStack> left = player.getInventory().addItem(items.screen169());
             if (!left.isEmpty()) {
                 left.values().forEach(s -> player.getWorld().dropItemNaturally(player.getLocation(), s));
@@ -372,7 +443,7 @@ public final class DisplayListener implements Listener {
             player.sendMessage("§aGot §b16:9 Display Screen§a — look at a wall and place it.");
             return;
         }
-        if (slot == 13) {
+        if (slot == 14) {
             Optional<DoomScreen> nearest = screens.findNearest(player.getLocation(), 48, ScreenKind.DISPLAY);
             if (nearest.isEmpty()) {
                 player.sendMessage("§cNo 16:9 display screen nearby. Place one first.");
@@ -385,12 +456,52 @@ public final class DisplayListener implements Listener {
             openGui(player, updated);
             return;
         }
-        if (slot == 15) {
-            // refresh status
+        if (slot == 16) {
             Optional<DisplayTerminalStore.Terminal> fresh = store.get(holder.terminal().location());
             player.closeInventory();
             fresh.ifPresent(t -> openGui(player, t));
         }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onChat(AsyncChatEvent event) {
+        String terminalKey = pendingText.remove(event.getPlayer().getUniqueId());
+        if (terminalKey == null) {
+            return;
+        }
+        event.setCancelled(true);
+        String msg = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
+        Player player = event.getPlayer();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (msg.equalsIgnoreCase("cancel")) {
+                player.sendMessage("§7Cancelled.");
+                return;
+            }
+            if (msg.isEmpty()) {
+                player.sendMessage("§cEmpty text ignored.");
+                return;
+            }
+            Optional<DisplayTerminalStore.Terminal> term = store.getByKey(terminalKey);
+            if (term.isEmpty()) {
+                player.sendMessage("§cTerminal gone.");
+                return;
+            }
+            DisplayTerminalStore.Terminal updated = term.get().withText(msg);
+            store.put(updated);
+            player.sendMessage("§aScreen text set:");
+            player.sendMessage("§f" + msg);
+            player.sendMessage("§7Live preview: §a" + DisplayTextRenderer.applyPlaceholders(msg, updated.location()));
+            if (isPowered(updated).powered()) {
+                pushTerminalText(updated);
+            } else {
+                player.sendMessage("§7Flick the lever §aON§7 to show it on the screen.");
+            }
+        });
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        pendingText.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler

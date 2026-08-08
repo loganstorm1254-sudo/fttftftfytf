@@ -6,6 +6,7 @@ import com.minedoom.display.DisplayInbox;
 import com.minedoom.display.DisplayItems;
 import com.minedoom.display.DisplayListener;
 import com.minedoom.display.DisplayTerminalStore;
+import com.minedoom.display.DisplayTextRenderer;
 import com.minedoom.doom.DoomEngine;
 import com.minedoom.google.GoogleBrowser;
 import com.minedoom.input.DoomInputListener;
@@ -71,8 +72,10 @@ public final class MineDoomPlugin extends JavaPlugin {
         displayItems = new DisplayItems(this);
         displayTerminalStore = new DisplayTerminalStore(this);
         displayTerminalStore.load();
-        displayInbox = new DisplayInbox(this, screenManager, displayTerminalStore);
-        DisplayListener displayListener = new DisplayListener(this, screenManager, displayItems, displayTerminalStore);
+        DisplayTextRenderer textRenderer = new DisplayTextRenderer(screenManager);
+        displayInbox = new DisplayInbox(this, screenManager, displayTerminalStore, textRenderer);
+        DisplayListener displayListener = new DisplayListener(
+                this, screenManager, displayItems, displayTerminalStore, textRenderer);
         getServer().getPluginManager().registerEvents(displayListener, this);
         displayInbox.start();
 
@@ -102,7 +105,7 @@ public final class MineDoomPlugin extends JavaPlugin {
         getLogger().info("MineDoom enabled — "
                 + (doomAvailable ? "PureDOOM ready (/doom)" : "DOOM unavailable")
                 + " · Google + video via /google play"
-                + " · Display Terminal (16:9 + Python)");
+                + " · Display Terminal (type text + {playercount})");
     }
 
     @Override

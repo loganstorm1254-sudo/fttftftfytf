@@ -17,23 +17,31 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Watches plugins/MineDoom/display/ for PNG/JPG frames from Python (or anything).
- * When a Display Terminal lever is ON, the newest frame is shown on the linked screen.
+ * Keeps powered Display Terminal screens updated:
+ * - always re-renders typed text (so {playercount} stays live)
+ * - optionally overlays a PNG from plugins/MineDoom/display/ if the terminal text is blank
  */
 public final class DisplayInbox {
 
     private final MineDoomPlugin plugin;
     private final ScreenManager screens;
     private final DisplayTerminalStore terminals;
+    private final DisplayTextRenderer textRenderer;
     private final Path inbox;
     private BukkitTask task;
     private FileTime lastSeen;
     private Path lastFile;
 
-    public DisplayInbox(MineDoomPlugin plugin, ScreenManager screens, DisplayTerminalStore terminals) {
+    public DisplayInbox(
+            MineDoomPlugin plugin,
+            ScreenManager screens,
+            DisplayTerminalStore terminals,
+            DisplayTextRenderer textRenderer
+    ) {
         this.plugin = plugin;
         this.screens = screens;
         this.terminals = terminals;
+        this.textRenderer = textRenderer;
         this.inbox = plugin.getDataFolder().toPath().resolve("display");
     }
 
@@ -47,15 +55,12 @@ public final class DisplayInbox {
             Path readme = inbox.resolve("README.txt");
             if (!Files.exists(readme)) {
                 Files.writeString(readme, """
-                        Drop PNG/JPG frames here from Python (or any tool).
+                        Optional: drop PNG/JPG frames here.
                         
-                        Preferred filename: frame.png
+                        Normal use is typing text in the Display Terminal GUI
+                        (supports {playercount}, {maxplayers}, {time}, etc).
                         
-                        Example:
-                          python examples/push_frame.py path/to/image.png
-                        
-                        The image appears on linked 16:9 screens while the
-                        Display Terminal lever is ON.
+                        PNGs are only used if a terminal's text is cleared to blank.
                         """);
             }
         } catch (Exception e) {
@@ -73,6 +78,37 @@ public final class DisplayInbox {
     }
 
     private void tick() {
+        try {
+            // Refresh typed text on every powered terminal (live placeholders)
+            for (DisplayTerminalStore.Terminal term : terminals.all()) {
+                if (term.linkedScreenId() == null) {
+                    continue;
+                }
+                var loc = term.location();
+                if (loc == null) {
+                    continue;
+                }
+                if (!loc.getBlock().isBlockPowered() && !loc.getBlock().isBlockIndirectlyPowered()) {
+                    continue;
+                }
+                Optional<DoomScreen> screen = screens.get(term.linkedScreenId());
+                if (screen.isEmpty() || screen.get().isHidden() || screen.get().getKind() != ScreenKind.DISPLAY) {
+                    continue;
+                }
+                String raw = term.text();
+                if (raw != null && !raw.isBlank()) {
+                    textRenderer.pushText(screen.get(), term.safeText(), loc);
+                }
+            }
+
+            // Optional PNG path only for terminals with blank text
+            refreshPngIfNeeded();
+        } catch (Exception e) {
+            plugin.getLogger().warning("Display refresh failed: " + e.getMessage());
+        }
+    }
+
+    private void refreshPngIfNeeded() {
         try {
             if (!Files.isDirectory(inbox)) {
                 return;
@@ -95,27 +131,29 @@ public final class DisplayInbox {
             if (newest.isEmpty()) {
                 return;
             }
-            if (lastSeen != null && lastFile != null
-                    && lastFile.equals(newest.get())
-                    && lastSeen.equals(newestTime)) {
-                return;
-            }
+            boolean changed = lastSeen == null || lastFile == null
+                    || !lastFile.equals(newest.get())
+                    || !lastSeen.equals(newestTime);
             lastSeen = newestTime;
             lastFile = newest.get();
+            if (!changed) {
+                return;
+            }
             BufferedImage img = ImageIO.read(newest.get().toFile());
             if (img == null) {
                 return;
             }
-
             for (DisplayTerminalStore.Terminal term : terminals.all()) {
                 if (term.linkedScreenId() == null) {
                     continue;
+                }
+                if (term.text() != null && !term.text().isBlank()) {
+                    continue; // typed text wins
                 }
                 var loc = term.location();
                 if (loc == null) {
                     continue;
                 }
-                // Only update screens whose terminal is powered
                 if (!loc.getBlock().isBlockPowered() && !loc.getBlock().isBlockIndirectlyPowered()) {
                     continue;
                 }
@@ -126,15 +164,14 @@ public final class DisplayInbox {
                 pushImage(screen.get(), img);
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("Display inbox tick failed: " + e.getMessage());
+            plugin.getLogger().warning("Display PNG tick failed: " + e.getMessage());
         }
     }
 
-    /** Push the latest inbox frame to one screen (e.g. right when lever turns on). */
+    /** Push the latest inbox frame to one screen (blank-text terminals only). */
     public void pushLatest(DoomScreen screen) {
         try {
             if (lastFile == null || !Files.exists(lastFile)) {
-                // try frame.png
                 Path frame = inbox.resolve("frame.png");
                 if (Files.exists(frame)) {
                     lastFile = frame;

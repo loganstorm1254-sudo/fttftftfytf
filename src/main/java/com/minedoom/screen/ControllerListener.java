@@ -247,7 +247,7 @@ public final class ControllerListener implements Listener {
             }
             player.closeInventory();
             player.sendMessage("§aGot §bDisplay Terminal");
-            player.sendMessage("§7Place it → right-click GUI → take 16:9 screen → lever ON shows Python frames.");
+            player.sendMessage("§7Place → right-click → Set text (e.g. Players: {playercount}) → 16:9 screen → lever ON.");
             return;
         }
         ScreenKind kind = items.kindOf(clicked);
