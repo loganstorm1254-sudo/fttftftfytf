@@ -99,27 +99,59 @@ public final class GoogleBrowser {
 
     /**
      * Capture / render a page to RGB for the map wall.
+     * @param allowScreenshot if false, never call thum.io — paint text/UI only
      */
     public byte[] captureRgb(String url, int outW, int outH) throws IOException, InterruptedException {
+        return captureRgb(url, outW, outH, false);
+    }
+
+    public byte[] captureRgb(String url, int outW, int outH, boolean allowScreenshot) throws IOException, InterruptedException {
         url = normalizeUrl(url);
         currentUrl = url;
         String lower = url.toLowerCase();
 
-        if (lower.contains("google.com/") && !lower.contains("/search") && !looksLikeDirectMedia(lower)) {
+        if (lower.contains("google.com/") && !lower.contains("/search") && !looksLikeVideoUrl(lower)) {
             return renderHome(outW, outH);
         }
         if ((lower.contains("google.com/search") || (lower.contains("q=") && lower.contains("google.")))
-                && !looksLikeDirectMedia(lower)) {
+                && !looksLikeVideoUrl(lower)) {
             String query = extractQuery(url);
             lastQuery = query;
             return renderSearch(query, outW, outH);
         }
-        // Media URLs should be played via VideoPlayer — if we get here, show a clear message
-        if (looksLikeDirectMedia(lower) || lower.contains("archive.org/")) {
-            return renderMessagePage(outW, outH, "Google",
-                    "Use /google play to watch this video on the wall (not a preview).");
+        if (looksLikeVideoUrl(lower)) {
+            return renderMessagePage(outW, outH, "Video",
+                    "Use /google play <url> for real playback — screenshots/previews are disabled here.");
         }
-        return renderExternalPage(url, outW, outH);
+        if (allowScreenshot) {
+            return renderExternalPage(url, outW, outH);
+        }
+        // No thum.io — simple text card so /google never "tries to make a preview" by accident
+        return renderExternalTextOnly(url, outW, outH);
+    }
+
+    public static boolean looksLikeDirectMedia(String lowerUrl) {
+        return looksLikeVideoUrl(lowerUrl);
+    }
+
+    public static boolean looksLikeVideoUrl(String lowerUrl) {
+        if (lowerUrl == null) {
+            return false;
+        }
+        String u = lowerUrl.toLowerCase();
+        return u.contains(".mp4")
+                || u.contains(".webm")
+                || u.contains(".mkv")
+                || u.contains(".mov")
+                || u.contains(".m3u8")
+                || u.contains(".ogv")
+                || u.contains(".mp3")
+                || u.contains("cloudfront.net/")
+                || u.contains("archive.org/")
+                || u.contains("youtube.com/")
+                || u.contains("youtu.be/")
+                || u.contains("/download/")
+                || u.contains("/stream/");
     }
 
     public String normalizeUrl(String raw) {
@@ -161,22 +193,6 @@ public final class GoogleBrowser {
         }
         text = text.replace(" ", "");
         return text.isBlank() ? null : text;
-    }
-
-    public static boolean looksLikeDirectMedia(String lowerUrl) {
-        if (lowerUrl == null) {
-            return false;
-        }
-        String u = lowerUrl.toLowerCase();
-        return u.contains(".mp4")
-                || u.contains(".webm")
-                || u.contains(".mkv")
-                || u.contains(".mov")
-                || u.contains(".m3u8")
-                || u.contains(".mp3")
-                || u.contains("cloudfront.net/")
-                || (u.contains("/download/") && u.contains("archive.org"))
-                || (u.contains("/file/") && u.contains("archive.org"));
     }
 
     public byte[] renderOfflineHome(int outW, int outH, String message) {
@@ -287,26 +303,13 @@ public final class GoogleBrowser {
         return scaleToRgb(img, outW, outH);
     }
 
-    private byte[] renderExternalPage(String url, int outW, int outH) throws IOException, InterruptedException {
-        // Real page preview via remote screenshot (MineKeep can't run Chrome)
-        BufferedImage shot = fetchRemoteScreenshot(url, Math.max(640, Math.min(1280, outW * 2)));
-        if (shot != null) {
-            return composeBrowserView(url, shot, outW, outH, null);
-        }
-
+    private byte[] renderExternalTextOnly(String url, int outW, int outH) throws IOException, InterruptedException {
         String html = "";
         try {
             html = fetchHtml(url);
         } catch (Exception e) {
             plugin.getLogger().warning("Page fetch failed for " + url + ": " + e.getMessage());
         }
-
-        BufferedImage og = fetchOgImage(html);
-        if (og != null) {
-            String title = cleanText(firstMatch(TITLE_TAG, html, url));
-            return composeBrowserView(url, og, outW, outH, title);
-        }
-
         String title = cleanText(firstMatch(TITLE_TAG, html, url));
         String desc = cleanText(firstMatch(META_DESC, html, ""));
         if (desc.isBlank() && !html.isBlank()) {
@@ -316,9 +319,8 @@ public final class GoogleBrowser {
             }
         }
         if (desc.isBlank()) {
-            desc = "Could not capture this page (screenshot service busy). Try /google refresh.";
+            desc = "Text view only. Use /google preview for a screenshot, or /google play for video.";
         }
-
         BufferedImage img = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         enableNice(g);
@@ -340,6 +342,29 @@ public final class GoogleBrowser {
         drawWrappedReturn(g, desc, 16, y, outW - 32, Math.max(10, outH / 24));
         g.dispose();
         return scaleToRgb(img, outW, outH);
+    }
+
+    private byte[] renderExternalPage(String url, int outW, int outH) throws IOException, InterruptedException {
+        // Only used by /google preview — remote screenshot
+        BufferedImage shot = fetchRemoteScreenshot(url, Math.max(640, Math.min(1280, outW * 2)));
+        if (shot != null) {
+            return composeBrowserView(url, shot, outW, outH, null);
+        }
+
+        String html = "";
+        try {
+            html = fetchHtml(url);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Page fetch failed for " + url + ": " + e.getMessage());
+        }
+
+        BufferedImage og = fetchOgImage(html);
+        if (og != null) {
+            String title = cleanText(firstMatch(TITLE_TAG, html, url));
+            return composeBrowserView(url, og, outW, outH, title);
+        }
+
+        return renderExternalTextOnly(url, outW, outH);
     }
 
     private byte[] composeBrowserView(String url, BufferedImage page, int outW, int outH, String caption) {

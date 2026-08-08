@@ -392,9 +392,26 @@ public final class VideoPlayer implements Listener {
 
     private void paintStatus(DoomScreen screen, String title, String detail) {
         try {
-            int w = screen.getPixelWidth();
-            int h = screen.getPixelHeight();
-            byte[] rgb = browser.renderOfflineHome(w, h, title + " — " + (detail == null ? "" : detail));
+            int w = Math.min(screen.getPixelWidth(), 512);
+            int h = Math.min(screen.getPixelHeight(), 288);
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var g = img.createGraphics();
+            g.setColor(java.awt.Color.BLACK);
+            g.fillRect(0, 0, w, h);
+            g.setColor(java.awt.Color.WHITE);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, Math.max(16, h / 12)));
+            String t = "▶ " + title;
+            int tw = g.getFontMetrics().stringWidth(t);
+            g.drawString(t, Math.max(8, (w - tw) / 2), h / 2);
+            if (detail != null && !detail.isBlank()) {
+                g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, Math.max(10, h / 22)));
+                g.setColor(new java.awt.Color(180, 180, 180));
+                String d = detail.length() > 60 ? detail.substring(0, 57) + "…" : detail;
+                int dw = g.getFontMetrics().stringWidth(d);
+                g.drawString(d, Math.max(8, (w - dw) / 2), h / 2 + Math.max(20, h / 10));
+            }
+            g.dispose();
+            byte[] rgb = GoogleBrowser.scaleToRgb(img, w, h);
             screens.pushImage(screen, rgb, w, h);
             var world = Bukkit.getWorld(screen.getWorldName());
             if (world != null) {

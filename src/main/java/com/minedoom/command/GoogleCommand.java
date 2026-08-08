@@ -78,7 +78,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     DoomScreen screen = screens.placeFromSelection(player, ScreenKind.GOOGLE);
                     player.sendMessage("§aGoogle screen placed §7(" + screen.getTilesX() + "x" + screen.getTilesY()
                             + " · face §f" + screen.getFacing() + "§7)");
-                    loadUrl(player, screen, browser.homeUrl(), "Google Home");
+                    showPainted(player, screen, browser.homeUrl(), "Google Home");
                 } catch (Exception e) {
                     player.sendMessage("§c" + e.getMessage());
                 }
@@ -89,7 +89,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cNo Google screen nearby. §7/google wand → /google place");
                     return true;
                 }
-                loadUrl(player, screen.get(), browser.homeUrl(), "Google Home");
+                showPainted(player, screen.get(), browser.homeUrl(), "Google Home");
             }
             case "search" -> {
                 if (args.length < 2) {
@@ -102,9 +102,39 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 String query = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-                loadUrl(player, screen.get(), browser.searchUrl(query), "Search: " + query);
+                showPainted(player, screen.get(), browser.searchUrl(query), "Search: " + query);
             }
-            case "go", "open", "url" -> {
+            case "go", "open", "url", "play", "watch", "video" -> {
+                // go + play both mean REAL video playback — never thum.io screenshots
+                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
+                if (screen.isEmpty()) {
+                    player.sendMessage("§cNo Google screen nearby.");
+                    return true;
+                }
+                String url = resolveUrlArg(player, args);
+                if (url == null) {
+                    if (sub.equals("play") || sub.equals("watch") || sub.equals("video")) {
+                        url = browser.getCurrentUrl();
+                        if (url == null || url.isBlank() || url.contains("google.com/")) {
+                            player.sendMessage("§cUsage: /google play <video-url>");
+                            player.sendMessage("§7Long links: put URL in a written book, hold it, §a/google play");
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+                try {
+                    url = browser.normalizeUrl(url);
+                } catch (Exception e) {
+                    player.sendMessage("§cBad URL: §7" + e.getMessage());
+                    return true;
+                }
+                player.sendMessage("§eStarting §freal video playback§e (not a preview)…");
+                video.play(player, screen.get(), url);
+            }
+            case "preview", "shot", "screenshot" -> {
+                // Explicit opt-in for page screenshots only
                 Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
                 if (screen.isEmpty()) {
                     player.sendMessage("§cNo Google screen nearby.");
@@ -120,30 +150,8 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cBad URL: §7" + e.getMessage());
                     return true;
                 }
-                // Any media / archive.org link → real player, never screenshot preview
-                if (GoogleBrowser.looksLikeDirectMedia(url) || url.toLowerCase(Locale.ROOT).contains("archive.org/")) {
-                    video.play(player, screen.get(), url);
-                } else {
-                    loadUrl(player, screen.get(), url, truncateLabel(url));
-                }
-            }
-            case "play", "watch", "video" -> {
-                Optional<DoomScreen> screen = screens.findNearestVisible(player.getLocation(), 24, ScreenKind.GOOGLE);
-                if (screen.isEmpty()) {
-                    player.sendMessage("§cNo Google screen nearby.");
-                    return true;
-                }
-                String url = resolveUrlArg(player, args);
-                if (url == null) {
-                    url = browser.getCurrentUrl();
-                    if (url == null || url.isBlank() || url.contains("google.com")) {
-                        player.sendMessage("§cUsage: /google play <video-url>");
-                        player.sendMessage("§7Long links: put URL in a written book, hold it, §a/google play");
-                        return true;
-                    }
-                }
-                // Always real playback — never a preview image
-                video.play(player, screen.get(), url);
+                player.sendMessage("§7Loading page screenshot preview…");
+                showPainted(player, screen.get(), url, "Preview: " + truncateLabel(url));
             }
             case "stop", "pause" -> {
                 if (!video.isPlaying()) {
@@ -159,7 +167,12 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cNo Google screen nearby.");
                     return true;
                 }
-                loadUrl(player, screen.get(), browser.getCurrentUrl(), "Refresh");
+                String cur = browser.getCurrentUrl();
+                if (GoogleBrowser.looksLikeVideoUrl(cur)) {
+                    video.play(player, screen.get(), cur);
+                } else {
+                    showPainted(player, screen.get(), cur, "Refresh");
+                }
             }
             case "remove", "delete" -> {
                 if (video.isPlaying()) {
@@ -203,16 +216,20 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
         return null;
     }
 
-    private void loadUrl(Player player, DoomScreen screen, String url, String label) {
-        player.sendMessage("§7Loading §f" + label + "§7…");
+    /** Painted Google UI / optional screenshot — never used for /google go|play. */
+    private void showPainted(Player player, DoomScreen screen, String url, String label) {
         int w = screen.getPixelWidth();
         int h = screen.getPixelHeight();
+        boolean wantShot = label.startsWith("Preview:");
 
         CompletableFuture.supplyAsync(() -> {
             try {
-                return browser.captureRgb(url, w, h);
+                if (wantShot) {
+                    return browser.captureRgb(url, w, h, true);
+                }
+                return browser.captureRgb(url, w, h, false);
             } catch (Exception e) {
-                plugin.getLogger().warning("Google capture failed: " + e.getMessage());
+                plugin.getLogger().warning("Google render failed: " + e.getMessage());
                 return browser.renderOfflineHome(w, h, "Failed: " + e.getMessage());
             }
         }).thenAccept(rgb -> Bukkit.getScheduler().runTask(plugin, () -> {
@@ -226,11 +243,12 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e§lGoogle Screen §8— separate from /doom");
         player.sendMessage("§e/google wand §7— wooden axe to select a wall");
         player.sendMessage("§e/google place §7— place a Google map screen");
-        player.sendMessage("§e/google home §7— show google.com");
-        player.sendMessage("§e/google search <query> §7— search Google");
-        player.sendMessage("§e/google go <url> §7— open a page (videos auto-play)");
-        player.sendMessage("§e/google play <url> §7— play video + sound on the wall");
+        player.sendMessage("§e/google home §7— painted Google homepage");
+        player.sendMessage("§e/google search <query> §7— search results");
+        player.sendMessage("§e/google go <url> §7— §fREAL video playback§7 (not a preview)");
+        player.sendMessage("§e/google play <url> §7— same as go — real video + sound");
         player.sendMessage("§e/google stop §7— stop video");
+        player.sendMessage("§e/google preview <url> §7— page screenshot only (optional)");
         player.sendMessage("§7  long links: URL in a book → hold → /google play");
         player.sendMessage("§e/google give §7— switch blocks (lever show/hide)");
         player.sendMessage("§8Accept the resource-pack prompt for audio.");
@@ -247,7 +265,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
             List<String> opts = Arrays.asList(
-                    "wand", "place", "home", "search", "go", "play", "stop", "refresh", "remove", "give", "status", "help");
+                    "wand", "place", "home", "search", "go", "play", "stop", "preview", "refresh", "remove", "give", "status", "help");
             String p = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();
             for (String o : opts) {
