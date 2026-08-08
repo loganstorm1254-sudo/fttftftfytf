@@ -16,6 +16,14 @@ invert-mouse-y: false
 # How far a screen switch looks for its matching screen (blocks)
 switch-range: 48
 
+# Display Terminal — 16:9 screen + Python PNG inbox (plugins/MineDoom/display/)
+display:
+  # Map tile grid (~16:9). 8×5 = 40 maps. Max 64 total.
+  tiles-x: 8
+  tiles-y: 5
+  # How often to poll for new PNG/JPG frames (ticks)
+  poll-ticks: 10
+
 # Google wall screens (/google) — HTTP mode, no Chrome install needed
 google:
   # Kill slow page fetches after this many seconds

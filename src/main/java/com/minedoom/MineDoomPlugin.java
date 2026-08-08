@@ -2,6 +2,10 @@ package com.minedoom;
 
 import com.minedoom.command.DoomCommand;
 import com.minedoom.command.GoogleCommand;
+import com.minedoom.display.DisplayInbox;
+import com.minedoom.display.DisplayItems;
+import com.minedoom.display.DisplayListener;
+import com.minedoom.display.DisplayTerminalStore;
 import com.minedoom.doom.DoomEngine;
 import com.minedoom.google.GoogleBrowser;
 import com.minedoom.input.DoomInputListener;
@@ -28,6 +32,9 @@ public final class MineDoomPlugin extends JavaPlugin {
     private ControllerItems controllerItems;
     private ControllerStore controllerStore;
     private ControllerListener controllerListener;
+    private DisplayItems displayItems;
+    private DisplayTerminalStore displayTerminalStore;
+    private DisplayInbox displayInbox;
     private FfmpegLocator ffmpegLocator;
     private VideoPlayer videoPlayer;
     private boolean doomAvailable;
@@ -61,6 +68,14 @@ public final class MineDoomPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(controllerListener, this);
         getServer().getPluginManager().registerEvents(new WandListener(selectionService), this);
 
+        displayItems = new DisplayItems(this);
+        displayTerminalStore = new DisplayTerminalStore(this);
+        displayTerminalStore.load();
+        displayInbox = new DisplayInbox(this, screenManager, displayTerminalStore);
+        DisplayListener displayListener = new DisplayListener(this, screenManager, displayItems, displayTerminalStore);
+        getServer().getPluginManager().registerEvents(displayListener, this);
+        displayInbox.start();
+
         ffmpegLocator = new FfmpegLocator(this);
         videoPlayer = new VideoPlayer(this, screenManager, ffmpegLocator, new AudioPackService(this), googleBrowser);
         getServer().getPluginManager().registerEvents(videoPlayer, this);
@@ -86,11 +101,15 @@ public final class MineDoomPlugin extends JavaPlugin {
 
         getLogger().info("MineDoom enabled — "
                 + (doomAvailable ? "PureDOOM ready (/doom)" : "DOOM unavailable")
-                + " · Google + video via /google play");
+                + " · Google + video via /google play"
+                + " · Display Terminal (16:9 + Python)");
     }
 
     @Override
     public void onDisable() {
+        if (displayInbox != null) {
+            displayInbox.stop();
+        }
         if (videoPlayer != null) {
             videoPlayer.stop();
         }
@@ -103,6 +122,9 @@ public final class MineDoomPlugin extends JavaPlugin {
         }
         if (controllerStore != null) {
             controllerStore.save();
+        }
+        if (displayTerminalStore != null) {
+            displayTerminalStore.save();
         }
         if (engine != null) {
             engine.shutdown();
@@ -135,6 +157,18 @@ public final class MineDoomPlugin extends JavaPlugin {
 
     public VideoPlayer getVideoPlayer() {
         return videoPlayer;
+    }
+
+    public DisplayItems getDisplayItems() {
+        return displayItems;
+    }
+
+    public DisplayTerminalStore getDisplayTerminalStore() {
+        return displayTerminalStore;
+    }
+
+    public DisplayInbox getDisplayInbox() {
+        return displayInbox;
     }
 
     public boolean isDoomAvailable() {

@@ -2,7 +2,9 @@ package com.minedoom.screen;
 
 public enum ScreenKind {
     DOOM,
-    GOOGLE;
+    GOOGLE,
+    /** Python / custom image display screens (16:9 terminal screens). */
+    DISPLAY;
 
     public static ScreenKind fromString(String raw) {
         if (raw == null) {

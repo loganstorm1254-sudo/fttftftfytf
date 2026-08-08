@@ -3,7 +3,7 @@ version: '${version}'
 main: com.minedoom.MineDoomPlugin
 api-version: '1.21'
 authors: [Logan]
-description: Play DOOM on a WorldEdit-placed map screen, plus separate Google wall screens.
+description: DOOM + Google map screens + Display Terminal (16:9 Python frames).
 website: https://github.com/loganstorm1254-sudo/fttftftfytf
 softdepend: [WorldEdit]
 commands:

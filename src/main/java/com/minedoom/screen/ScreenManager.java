@@ -219,7 +219,11 @@ public final class ScreenManager {
         List<UUID> frameIds = new ArrayList<>();
         java.util.Set<String> usedBlocks = new java.util.HashSet<>();
         List<org.bukkit.entity.ItemFrame> frames = new ArrayList<>();
-        String mapLabel = kind == ScreenKind.GOOGLE ? "§eGoogle" : "§cMineDoom";
+        String mapLabel = switch (kind) {
+            case GOOGLE -> "§eGoogle";
+            case DISPLAY -> "§bDisplay 16:9";
+            default -> "§cMineDoom";
+        };
 
         // 1) Spawn every frame first (sky→teleport trick), no maps yet
         for (int ty = 0; ty < tilesY; ty++) {
@@ -290,6 +294,10 @@ public final class ScreenManager {
                 placeholder[i] = (byte) 255;
                 placeholder[i + 1] = (byte) 255;
                 placeholder[i + 2] = (byte) 255;
+            } else if (kind == ScreenKind.DISPLAY) {
+                placeholder[i] = 10;
+                placeholder[i + 1] = 14;
+                placeholder[i + 2] = 28;
             } else {
                 placeholder[i] = 40;
                 placeholder[i + 1] = 40;
@@ -306,6 +314,69 @@ public final class ScreenManager {
                 + tilesX + "x" + tilesY + " facing " + facing + " maps=" + mapIds);
 
         return screen;
+    }
+
+    /**
+     * Place a fixed-size widescreen (e.g. 16:9 as tilesX×tilesY) on the wall face the player looks at.
+     */
+    public DoomScreen placeWidescreen(Player player, ScreenKind kind, int tilesX, int tilesY) throws Exception {
+        if (tilesX < 1 || tilesY < 1) {
+            throw new IllegalStateException("Invalid screen size");
+        }
+        if (tilesX * tilesY > 64) {
+            throw new IllegalStateException("Screen too large (max 64 maps). Lower display.tiles-x / tiles-y.");
+        }
+        var hit = player.rayTraceBlocks(8);
+        if (hit == null || hit.getHitBlock() == null || hit.getHitBlockFace() == null) {
+            throw new IllegalStateException("Look at a solid wall within 8 blocks.");
+        }
+        Block origin = hit.getHitBlock();
+        BlockFace face = hit.getHitBlockFace();
+        if (face != BlockFace.NORTH && face != BlockFace.SOUTH
+                && face != BlockFace.EAST && face != BlockFace.WEST) {
+            throw new IllegalStateException("Look at a vertical wall face.");
+        }
+        if (!origin.getType().isSolid()) {
+            throw new IllegalStateException("Target block is not solid.");
+        }
+
+        // Build a tilesX by tilesY rectangle on the wall plane, origin at looked block, growing up+right
+        int minX = origin.getX();
+        int maxX = origin.getX();
+        int minY = origin.getY();
+        int maxY = origin.getY() + (tilesY - 1);
+        int minZ = origin.getZ();
+        int maxZ = origin.getZ();
+        int sizeX;
+        int sizeZ;
+
+        if (face == BlockFace.NORTH || face == BlockFace.SOUTH) {
+            // wall in X-Y plane
+            maxX = origin.getX() + (tilesX - 1);
+            sizeX = tilesX;
+            sizeZ = 1;
+        } else {
+            // wall in Z-Y plane
+            maxZ = origin.getZ() + (tilesX - 1);
+            sizeX = 1;
+            sizeZ = tilesX;
+        }
+
+        // Ensure every wall block exists / is solid — fill missing with the origin material
+        World world = player.getWorld();
+        Material fill = origin.getType();
+        for (int y = minY; y <= maxY; y++) {
+            for (int i = 0; i < tilesX; i++) {
+                int x = (sizeZ == 1) ? (minX + i) : minX;
+                int z = (sizeX == 1) ? (minZ + i) : minZ;
+                Block b = world.getBlockAt(x, y, z);
+                if (!b.getType().isSolid()) {
+                    b.setType(fill, false);
+                }
+            }
+        }
+
+        return buildScreen(player, kind, minX, minY, minZ, maxX, maxY, maxZ, sizeX, sizeZ, face, tilesX, tilesY);
     }
 
     public void pushImage(DoomScreen screen, byte[] rgb, int w, int h) {
@@ -374,7 +445,11 @@ public final class ScreenManager {
 
         List<UUID> frameIds = new ArrayList<>();
         List<org.bukkit.entity.ItemFrame> frames = new ArrayList<>();
-        String mapLabel = screen.getKind() == ScreenKind.GOOGLE ? "§eGoogle" : "§cMineDoom";
+        String mapLabel = switch (screen.getKind()) {
+            case GOOGLE -> "§eGoogle";
+            case DISPLAY -> "§bDisplay 16:9";
+            default -> "§cMineDoom";
+        };
 
         for (int ty = 0; ty < tilesY; ty++) {
             for (int tx = 0; tx < tilesX; tx++) {

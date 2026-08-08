@@ -71,8 +71,11 @@ public final class ControllerListener implements Listener {
         GiveMenuHolder holder = new GiveMenuHolder();
         Inventory inv = plugin.getServer().createInventory(holder, 9, "MineDoom Blocks");
         holder.setInventory(inv);
-        inv.setItem(3, items.doomSwitch());
-        inv.setItem(5, items.googleSwitch());
+        inv.setItem(2, items.doomSwitch());
+        inv.setItem(4, items.googleSwitch());
+        if (plugin.getDisplayItems() != null) {
+            inv.setItem(6, plugin.getDisplayItems().terminalBlock());
+        }
         player.openInventory(inv);
     }
 
@@ -232,6 +235,19 @@ public final class ControllerListener implements Listener {
         }
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType().isAir()) {
+            return;
+        }
+        if (plugin.getDisplayItems() != null && plugin.getDisplayItems().isTerminal(clicked)) {
+            ItemStack give = plugin.getDisplayItems().terminalBlock();
+            give.setAmount(1);
+            HashMap<Integer, ItemStack> overflow = player.getInventory().addItem(give);
+            if (!overflow.isEmpty()) {
+                overflow.values().forEach(stack ->
+                        player.getWorld().dropItemNaturally(player.getLocation(), stack));
+            }
+            player.closeInventory();
+            player.sendMessage("§aGot §bDisplay Terminal");
+            player.sendMessage("§7Place it → right-click GUI → take 16:9 screen → lever ON shows Python frames.");
             return;
         }
         ScreenKind kind = items.kindOf(clicked);

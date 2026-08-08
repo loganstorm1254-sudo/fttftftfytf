@@ -250,7 +250,7 @@ public final class GoogleCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/google stop §7— stop video");
         player.sendMessage("§e/google preview <url> §7— page screenshot only (optional)");
         player.sendMessage("§7  long links: URL in a book → hold → /google play");
-        player.sendMessage("§e/google give §7— switch blocks (lever show/hide)");
+        player.sendMessage("§e/google give §7— switches + Display Terminal (16:9 / Python)");
         player.sendMessage("§8Accept the resource-pack prompt for audio.");
     }
 

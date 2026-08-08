@@ -157,7 +157,7 @@ public final class DoomCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/doom play §7— sit down and play with keyboard & mouse");
         player.sendMessage("§e/doom stop §7— exit play mode");
         player.sendMessage("§e/doom remove §7— remove nearest screen");
-        player.sendMessage("§e/doom give §7— open switch blocks (lever show/hide)");
+        player.sendMessage("§e/doom give §7— Doom/Google switches + Display Terminal");
         player.sendMessage("§e/doom enter §7— press Enter (menus)");
         player.sendMessage("§e/doom esc §7— press Escape");
         player.sendMessage("§8Controls: WASD · mouse look · LMB fire · RMB use · Sprint run · hotbar weapons");
