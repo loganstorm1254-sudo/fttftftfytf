@@ -17,20 +17,23 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 /**
- * DonutSMP-style /sell — fixed prices per material.
- * /sell | /sell hand — sell held item
- * /sell all — sell everything sellable in inventory (+ offhand)
+ * DonutSMP-style /sell — GUI deposit grid + green sell button.
+ * /sell — open sell menu
+ * /sell hand — sell held item
+ * /sell all — sell everything sellable in inventory
  * /sell price — show price of held item
  */
 public final class SellCommands implements CommandExecutor, TabCompleter {
 	private final SellService sell;
 	private final EconomyService economy;
 	private final EconomyScoreboard scoreboard;
+	private final SellGui sellGui;
 
-	public SellCommands(SellService sell, EconomyService economy, EconomyScoreboard scoreboard) {
+	public SellCommands(SellService sell, EconomyService economy, EconomyScoreboard scoreboard, SellGui sellGui) {
 		this.sell = sell;
 		this.economy = economy;
 		this.scoreboard = scoreboard;
+		this.sellGui = sellGui;
 	}
 
 	@Override
@@ -48,16 +51,19 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 			return true;
 		}
 
-		if (args.length == 0 || args[0].equalsIgnoreCase("hand")) {
-			return sellHand(player);
+		if (args.length == 0 || args[0].equalsIgnoreCase("gui") || args[0].equalsIgnoreCase("menu")) {
+			sellGui.open(player);
+			return true;
 		}
 
 		String sub = args[0].toLowerCase(Locale.ROOT);
 		return switch (sub) {
+			case "hand" -> sellHand(player);
 			case "all", "inv", "inventory" -> sellAll(player);
 			case "price", "worth", "check" -> showPrice(player);
 			case "help" -> {
-				player.sendMessage(Component.text("/sell — sell item in hand", NamedTextColor.YELLOW));
+				player.sendMessage(Component.text("/sell — open sell menu (put items, click green SELL)", NamedTextColor.YELLOW));
+				player.sendMessage(Component.text("/sell hand — sell item in hand", NamedTextColor.YELLOW));
 				player.sendMessage(Component.text("/sell all — sell all sellable items in your inventory", NamedTextColor.YELLOW));
 				player.sendMessage(Component.text("/sell price — check the fixed price of your held item", NamedTextColor.YELLOW));
 				if (player.isOp() || player.hasPermission("chunkboomerits.*")) {
@@ -109,7 +115,7 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 			}
 			default -> {
 				player.sendMessage(Component.text(
-						"Usage: /sell [hand|all|price|fill|regenerate|reload]",
+						"Usage: /sell | /sell hand|all|price",
 						NamedTextColor.YELLOW
 				));
 				yield true;
@@ -120,7 +126,7 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 	private boolean sellHand(Player player) {
 		ItemStack hand = player.getInventory().getItemInMainHand();
 		if (hand.getType().isAir()) {
-			player.sendMessage(Component.text("Hold an item to sell, or use /sell all", NamedTextColor.RED));
+			player.sendMessage(Component.text("Hold an item to sell, or use /sell", NamedTextColor.RED));
 			return true;
 		}
 		if (!sell.isSellable(hand)) {
@@ -219,7 +225,7 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 		if (args.length == 1) {
 			String p = args[0].toLowerCase(Locale.ROOT);
 			List<String> out = new ArrayList<>();
-			for (String s : List.of("hand", "all", "price", "help")) {
+			for (String s : List.of("gui", "hand", "all", "price", "help")) {
 				if (s.startsWith(p)) {
 					out.add(s);
 				}

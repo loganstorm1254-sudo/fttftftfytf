@@ -22,6 +22,8 @@ public final class OpItems {
 	public static NamespacedKey KILL_HAMMER_KEY;
 	public static NamespacedKey INVINCIBLE_HELMET_KEY;
 	public static NamespacedKey SCOREBOARD_SHOVEL_KEY;
+	public static NamespacedKey HOLE_FILLER_KEY;
+	public static NamespacedKey HOLE_FILLER_MODE_KEY;
 
 	private OpItems() {
 	}
@@ -32,6 +34,8 @@ public final class OpItems {
 		KILL_HAMMER_KEY = new NamespacedKey(plugin, "kill_hammer");
 		INVINCIBLE_HELMET_KEY = new NamespacedKey(plugin, "invincible_helmet");
 		SCOREBOARD_SHOVEL_KEY = new NamespacedKey(plugin, "scoreboard_shovel");
+		HOLE_FILLER_KEY = new NamespacedKey(plugin, "hole_filler");
+		HOLE_FILLER_MODE_KEY = new NamespacedKey(plugin, "hole_filler_mode");
 		CustomDisc.init(plugin);
 	}
 
@@ -198,6 +202,67 @@ public final class OpItems {
 
 	public static boolean isScoreboardShovel(ItemStack stack) {
 		return hasKey(stack, SCOREBOARD_SHOVEL_KEY);
+	}
+
+	public static ItemStack createHoleFiller() {
+		ItemStack stack = new ItemStack(Material.BRUSH);
+		ItemMeta meta = requireMeta(stack, "Hole Filler");
+		meta.getPersistentDataContainer().set(HOLE_FILLER_KEY, PersistentDataType.BYTE, (byte) 1);
+		meta.getPersistentDataContainer().set(HOLE_FILLER_MODE_KEY, PersistentDataType.STRING, NaturalFiller.Mode.HOLE.name());
+		meta.setUnbreakable(true);
+		meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+		meta.setEnchantmentGlintOverride(true);
+		applyHoleFillerMeta(meta, NaturalFiller.Mode.HOLE);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
+	public static boolean isHoleFiller(ItemStack stack) {
+		return hasKey(stack, HOLE_FILLER_KEY);
+	}
+
+	public static NaturalFiller.Mode holeFillerMode(ItemStack stack) {
+		if (!isHoleFiller(stack) || !stack.hasItemMeta()) {
+			return NaturalFiller.Mode.HOLE;
+		}
+		String raw = stack.getItemMeta().getPersistentDataContainer().get(HOLE_FILLER_MODE_KEY, PersistentDataType.STRING);
+		if (raw == null) {
+			return NaturalFiller.Mode.HOLE;
+		}
+		try {
+			return NaturalFiller.Mode.valueOf(raw);
+		} catch (IllegalArgumentException ex) {
+			return NaturalFiller.Mode.HOLE;
+		}
+	}
+
+	public static NaturalFiller.Mode cycleHoleFillerMode(ItemStack stack) {
+		NaturalFiller.Mode next = holeFillerMode(stack) == NaturalFiller.Mode.HOLE
+				? NaturalFiller.Mode.WALL
+				: NaturalFiller.Mode.HOLE;
+		ItemMeta meta = stack.getItemMeta();
+		if (meta == null) {
+			return next;
+		}
+		meta.getPersistentDataContainer().set(HOLE_FILLER_MODE_KEY, PersistentDataType.STRING, next.name());
+		applyHoleFillerMeta(meta, next);
+		stack.setItemMeta(meta);
+		return next;
+	}
+
+	private static void applyHoleFillerMeta(ItemMeta meta, NaturalFiller.Mode mode) {
+		meta.displayName(Component.text("Hole Filler", NamedTextColor.GREEN)
+				.decoration(TextDecoration.ITALIC, false));
+		meta.lore(List.of(
+				Component.text("OP Tools", NamedTextColor.DARK_RED).decoration(TextDecoration.ITALIC, false),
+				Component.text("Mode: " + mode.name(), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false),
+				Component.text("Right-click gap: fill naturally", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false),
+				Component.text("Sneak + right-click: HOLE ↔ WALL", NamedTextColor.GRAY)
+						.decoration(TextDecoration.ITALIC, false),
+				Component.text("Left-click: undo last fill", NamedTextColor.DARK_GRAY)
+						.decoration(TextDecoration.ITALIC, false)
+		));
 	}
 
 	public static boolean isDespacitoDisc(ItemStack stack) {

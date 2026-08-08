@@ -164,7 +164,7 @@ public final class SellService {
 		}
 		if (OpItems.isBoomerits(stack) || OpItems.isKickSword(stack) || OpItems.isKillHammer(stack)
 				|| OpItems.isInvincibleHelmet(stack) || OpItems.isScoreboardShovel(stack)
-				|| OpItems.isCustomDisc(stack)) {
+				|| OpItems.isHoleFiller(stack) || OpItems.isCustomDisc(stack)) {
 			return false;
 		}
 		Double price = prices.get(stack.getType());

@@ -31,6 +31,10 @@ commands:
     description: Give the Scoreboard Shovel (OP only)
     usage: /sbshovel [player]
     aliases: [scoreboardshovel, ecoshovel]
+  holefiller:
+    description: Give the Hole Filler wand (OP only)
+    usage: /holefiller [player]
+    aliases: [wallfiller, naturalfiller, hfiller]
   despacito:
     description: Give the Despacito music disc
     usage: /despacito [player]
@@ -82,8 +86,8 @@ commands:
     usage: /shopadd <price>
     aliases: [cbshopadd]
   sell:
-    description: Sell items for dollars at fixed prices
-    usage: /sell [hand|all|price|fill|regenerate|reload]
+    description: Open DonutSMP-style sell menu (or sell hand/all)
+    usage: /sell | /sell hand|all|price
     aliases: [cbsell]
 
 permissions:
@@ -104,6 +108,9 @@ permissions:
     default: op
   chunkboomerits.scoreboard:
     description: Use the Scoreboard Shovel editor
+    default: op
+  chunkboomerits.holefiller:
+    description: Use the Hole Filler wand
     default: op
   chunkboomerits.disc:
     description: Give custom music discs
@@ -136,6 +143,7 @@ permissions:
       chunkboomerits.killhammer: true
       chunkboomerits.invhelmet: true
       chunkboomerits.scoreboard: true
+      chunkboomerits.holefiller: true
       chunkboomerits.disc: true
       chunkboomerits.economy.bal: true
       chunkboomerits.economy.pay: true

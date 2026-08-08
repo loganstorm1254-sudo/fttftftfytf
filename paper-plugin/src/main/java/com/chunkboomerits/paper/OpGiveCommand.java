@@ -56,6 +56,10 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 		return new OpGiveCommand("chunkboomerits.scoreboard", "Scoreboard Shovel", amount -> OpItems.createScoreboardShovel(), false);
 	}
 
+	public static OpGiveCommand holeFiller() {
+		return new OpGiveCommand("chunkboomerits.holefiller", "Hole Filler", amount -> OpItems.createHoleFiller(), false);
+	}
+
 	public static OpGiveCommand disc(CustomDisc disc) {
 		return new OpGiveCommand("chunkboomerits.disc", disc.itemLabel(), amount -> disc.create(), false);
 	}
@@ -223,7 +227,7 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 
 	private static final class CbGiveCommand implements CommandExecutor, TabCompleter {
 		private static final List<String> ITEMS = List.of(
-				"boomerits", "kicksword", "killhammer", "invhelmet", "sbshovel",
+				"boomerits", "kicksword", "killhammer", "invhelmet", "sbshovel", "holefiller",
 				"despacito", "moskau", "kimjonggoon"
 		);
 
@@ -294,6 +298,7 @@ public final class OpGiveCommand implements CommandExecutor, TabCompleter {
 				case "killhammer", "hammer", "instakillhammer" -> new GiveSpec("chunkboomerits.killhammer", "Insta Kill Hammer", OpItems::createKillHammer);
 				case "invhelmet", "invinciblehelmet", "copperhelmet" -> new GiveSpec("chunkboomerits.invhelmet", "Invincible Copper Helmet", OpItems::createInvincibleHelmet);
 				case "sbshovel", "scoreboardshovel", "scoreshovel" -> new GiveSpec("chunkboomerits.scoreboard", "Scoreboard Shovel", OpItems::createScoreboardShovel);
+				case "holefiller", "hole_filler", "filler", "wallfiller" -> new GiveSpec("chunkboomerits.holefiller", "Hole Filler", OpItems::createHoleFiller);
 				case "despacito" -> new GiveSpec("chunkboomerits.disc", CustomDisc.DESPACITO.itemLabel(), CustomDisc.DESPACITO::create);
 				case "moskau" -> new GiveSpec("chunkboomerits.disc", CustomDisc.MOSKAU.itemLabel(), CustomDisc.MOSKAU::create);
 				case "kimjonggoon", "kimjong" -> new GiveSpec("chunkboomerits.disc", CustomDisc.KIM_JONG_GOON.itemLabel(), CustomDisc.KIM_JONG_GOON::create);
