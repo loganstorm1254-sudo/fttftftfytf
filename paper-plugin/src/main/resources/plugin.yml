@@ -93,6 +93,14 @@ commands:
     description: Random teleport — pick how many blocks away
     usage: /rtp | /rtp <blocks>
     aliases: [wild, randomtp, cbrtp]
+  freeze:
+    description: Freeze a player or everyone (OP)
+    usage: /freeze <player|all>
+    aliases: [cbfreeze]
+  unfreeze:
+    description: Unfreeze a player or everyone (OP)
+    usage: /unfreeze <player|all>
+    aliases: [thaw, cbunfreeze]
 
 permissions:
   chunkboomerits.give:
@@ -140,6 +148,9 @@ permissions:
   chunkboomerits.rtp:
     description: Use /rtp random teleport
     default: true
+  chunkboomerits.freeze:
+    description: Freeze and unfreeze players
+    default: op
   chunkboomerits.*:
     description: All Chunk Boomerits tools
     default: op
@@ -159,3 +170,4 @@ permissions:
       chunkboomerits.shop: true
       chunkboomerits.sell: true
       chunkboomerits.rtp: true
+      chunkboomerits.freeze: true

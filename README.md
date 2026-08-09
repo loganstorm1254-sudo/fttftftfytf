@@ -1,12 +1,21 @@
 # Chunk Boomerits + Economy + AH + Shop + Sell
 
-**Paper / Purpur 1.21.11 — jar `1.8.1`**
+**Paper / Purpur 1.21.11 — jar `1.8.2`**
 
 ## Install
 1. Delete ALL old ChunkBoomerits jars from `plugins/`
-2. Put `dist/ChunkBoomerits-1.8.1.jar` in `plugins/`
+2. Put `dist/ChunkBoomerits-1.8.2.jar` in `plugins/`
 3. **Fully restart** (not `/reload`)
 4. Keep `plugins/ChunkBoomerits/` when updating (shop/AH/economy/sell prices)
+
+## Freeze (OP)
+```
+/freeze <player>     # freeze one player
+/freeze all          # freeze everyone (except you)
+/unfreeze <player>   # unfreeze one player
+/unfreeze all        # unfreeze everyone
+```
+Frozen players can't move/interact. A **Frozen** hologram appears above their head.
 
 ## RTP
 ```

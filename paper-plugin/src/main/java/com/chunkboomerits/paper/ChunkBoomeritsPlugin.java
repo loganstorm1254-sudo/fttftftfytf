@@ -33,6 +33,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 	private ShopGui shopGui;
 	private SellService sellService;
 	private AdminHubGui adminHubGui;
+	private FreezeService freezeService;
 
 	@Override
 	public void onEnable() {
@@ -181,6 +182,28 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		}
 		getServer().getPluginManager().registerEvents(rtpGui, this);
 
+		freezeService = new FreezeService(this);
+		freezeService.start();
+		FreezeCommand freezeCmd = FreezeCommand.freeze(freezeService);
+		FreezeCommand unfreezeCmd = FreezeCommand.unfreeze(freezeService);
+		PluginCommand freeze = getCommand("freeze");
+		if (freeze != null) {
+			freeze.setExecutor(freezeCmd);
+			freeze.setTabCompleter(freezeCmd);
+			getLogger().info("Registered /freeze");
+		} else {
+			getLogger().severe("Command /freeze missing from plugin.yml");
+		}
+		PluginCommand unfreeze = getCommand("unfreeze");
+		if (unfreeze != null) {
+			unfreeze.setExecutor(unfreezeCmd);
+			unfreeze.setTabCompleter(unfreezeCmd);
+			getLogger().info("Registered /unfreeze");
+		} else {
+			getLogger().severe("Command /unfreeze missing from plugin.yml");
+		}
+		getServer().getPluginManager().registerEvents(new FreezeListener(freezeService), this);
+
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
 		getServer().getPluginManager().registerEvents(new InvincibleHelmetListener(), this);
 		getServer().getPluginManager().registerEvents(new GiveInterceptListener(), this);
@@ -190,11 +213,14 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Market ready: /sell /rtp /ah /shop — OP: /sbshovel /banhammer");
+		getLogger().info("Ready: /sell /rtp /ah /shop — OP: /freeze /unfreeze /sbshovel /banhammer");
 	}
 
 	@Override
 	public void onDisable() {
+		if (freezeService != null) {
+			freezeService.shutdown();
+		}
 		if (economy != null) {
 			economy.save();
 		}
