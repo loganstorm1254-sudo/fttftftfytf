@@ -1,5 +1,7 @@
 package com.chunkboomerits.paper;
 
+import java.time.Duration;
+
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
@@ -114,6 +116,51 @@ public final class OpToolsListener implements Listener {
 
 		attacker.sendMessage(Component.text("Kicked " + victim.getName() + " from the server.", NamedTextColor.LIGHT_PURPLE));
 		ChunkBoomeritsPlugin.get().getLogger().info(attacker.getName() + " kick-sworded " + victim.getName());
+	}
+
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
+	public void onBanSwordHit(EntityDamageByEntityEvent event) {
+		if (!(event.getDamager() instanceof Player attacker)) {
+			return;
+		}
+		if (!(event.getEntity() instanceof Player victim)) {
+			return;
+		}
+
+		ItemStack weapon = attacker.getInventory().getItemInMainHand();
+		if (!OpItems.isBanSword(weapon)) {
+			return;
+		}
+
+		// Cancel damage so creative / survival both just get banned
+		event.setCancelled(true);
+
+		if (!attacker.isOp() && !attacker.hasPermission("chunkboomerits.banhammer")) {
+			attacker.sendMessage(Component.text("Ban Sword is OP-only.", NamedTextColor.RED));
+			return;
+		}
+
+		if (attacker.getUniqueId().equals(victim.getUniqueId())) {
+			attacker.sendMessage(Component.text("You can't ban yourself.", NamedTextColor.RED));
+			return;
+		}
+
+		long millis = OpItems.banSwordDurationMillis(weapon);
+		String length = OpItems.banSwordDurationLabel(weapon);
+		String reason = "Banned by " + attacker.getName() + " with the Ban Sword (" + length + ")";
+
+		Duration duration = millis < 0 ? null : Duration.ofMillis(millis);
+		// kickPlayer=true — works even if the target is in creative
+		victim.ban(reason, duration, attacker.getName(), true);
+
+		victim.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.55f, 1.35f);
+		attacker.sendMessage(Component.text(
+				"Banned " + victim.getName() + " for " + length + ".",
+				NamedTextColor.DARK_RED
+		));
+		ChunkBoomeritsPlugin.get().getLogger().info(
+				attacker.getName() + " ban-sworded " + victim.getName() + " for " + length
+		);
 	}
 
 	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

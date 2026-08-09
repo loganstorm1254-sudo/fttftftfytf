@@ -31,10 +31,10 @@ commands:
     description: Give the Scoreboard Shovel (OP only)
     usage: /sbshovel [player]
     aliases: [scoreboardshovel, ecoshovel]
-  holefiller:
-    description: Give the Hole Filler wand (OP only)
-    usage: /holefiller [player]
-    aliases: [wallfiller, naturalfiller, hfiller]
+  banhammer:
+    description: Give a wooden Ban Sword with a ban duration (OP only)
+    usage: /banhammer <duration> [player]
+    aliases: [bansword, cbbanhammer]
   despacito:
     description: Give the Despacito music disc
     usage: /despacito [player]
@@ -109,8 +109,8 @@ permissions:
   chunkboomerits.scoreboard:
     description: Use the Scoreboard Shovel editor
     default: op
-  chunkboomerits.holefiller:
-    description: Use the Hole Filler wand
+  chunkboomerits.banhammer:
+    description: Give and use the Ban Sword
     default: op
   chunkboomerits.disc:
     description: Give custom music discs
@@ -143,7 +143,7 @@ permissions:
       chunkboomerits.killhammer: true
       chunkboomerits.invhelmet: true
       chunkboomerits.scoreboard: true
-      chunkboomerits.holefiller: true
+      chunkboomerits.banhammer: true
       chunkboomerits.disc: true
       chunkboomerits.economy.bal: true
       chunkboomerits.economy.pay: true

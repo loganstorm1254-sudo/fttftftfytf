@@ -42,8 +42,8 @@ public final class GiveInterceptListener implements Listener {
 			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:sb_?shovel|scoreboard_?shovel|eco_?shovel)\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
-	private static final Pattern HOLE_FILLER = Pattern.compile(
-			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:hole_?filler|wall_?filler|natural_?filler)\\b(?:\\s+(\\d+))?",
+	private static final Pattern BAN_SWORD = Pattern.compile(
+			"^/?give\\s+(\\S+)\\s+(?:chunkboomerits:)?(?:ban_?sword|ban_?hammer)\\b(?:\\s+(\\d+))?",
 			Pattern.CASE_INSENSITIVE
 	);
 	private static final Pattern CUSTOM_DISC = Pattern.compile(
@@ -104,10 +104,11 @@ public final class GiveInterceptListener implements Listener {
 					"chunkboomerits.scoreboard", "Scoreboard Shovel", false, OpItems::createScoreboardShovel);
 		}
 
-		Matcher holeFiller = HOLE_FILLER.matcher(message);
-		if (holeFiller.find()) {
-			return give(sender, holeFiller.group(1), 1,
-					"chunkboomerits.holefiller", "Hole Filler", false, OpItems::createHoleFiller);
+		Matcher banSword = BAN_SWORD.matcher(message);
+		if (banSword.find()) {
+			return give(sender, banSword.group(1), 1,
+					"chunkboomerits.banhammer", "Ban Sword", false,
+					() -> OpItems.createBanSword(86_400_000L, "1 day"));
 		}
 
 		Matcher disc = CUSTOM_DISC.matcher(message);

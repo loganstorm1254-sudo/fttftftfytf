@@ -1,10 +1,10 @@
 # Chunk Boomerits + Economy + AH + Shop + Sell
 
-**Paper / Purpur 1.21.11 — jar `1.7.8`**
+**Paper / Purpur 1.21.11 — jar `1.8.0`**
 
 ## Install
 1. Delete ALL old ChunkBoomerits jars from `plugins/`
-2. Put `dist/ChunkBoomerits-1.7.8.jar` in `plugins/`
+2. Put `dist/ChunkBoomerits-1.8.0.jar` in `plugins/`
 3. **Fully restart** (not `/reload`)
 4. Keep `plugins/ChunkBoomerits/` when updating (shop/AH/economy/sell prices)
 
@@ -19,15 +19,15 @@
 
 **OP shovel** (`/sbshovel`): Admin hub → **Sell Prices** — edit every item's `/sell` price.
 
-## Hole Filler (OP)
+## Ban Sword (OP)
 ```
-/holefiller          # give the wand
-/cbgive holefiller
+/banhammer <duration> [player]
 ```
-- **Right-click a real pocket / missing wall block** → fills only that gap (copies nearby blocks)
-- Refuses open air, cliff faces, and valleys — will not build mountains
-- **Sneak + right-click** → **HOLE** ↔ **WALL**
-- **Left-click** → undo
+Gives a **wooden Ban Sword**. Hit a player to ban them (works in creative too).
+
+Durations: `1s` `10s` `30s` `1m` `5m` `1h` `1d` `7d` `1w` `1mo` `1y` `perm`
+
+Examples: `/banhammer 1d` · `/banhammer 5m` · `/banhammer perm`
 
 ## Auction / Shop / Economy
 ```

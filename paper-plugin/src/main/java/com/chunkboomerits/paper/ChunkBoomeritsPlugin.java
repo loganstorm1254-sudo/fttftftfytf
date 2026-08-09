@@ -46,7 +46,15 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		bind("killhammer", OpGiveCommand.killHammer());
 		bind("invhelmet", OpGiveCommand.invincibleHelmet());
 		bind("sbshovel", OpGiveCommand.scoreboardShovel());
-		bind("holefiller", OpGiveCommand.holeFiller());
+		PluginCommand banHammer = getCommand("banhammer");
+		if (banHammer != null) {
+			BanHammerCommand banCmd = new BanHammerCommand();
+			banHammer.setExecutor(banCmd);
+			banHammer.setTabCompleter(banCmd);
+			getLogger().info("Registered /banhammer");
+		} else {
+			getLogger().severe("Command /banhammer missing from plugin.yml");
+		}
 		bind("despacito", OpGiveCommand.despacito());
 		bind("moskau", OpGiveCommand.moskau());
 		bind("kimjonggoon", OpGiveCommand.kimJongGoon());
@@ -161,7 +169,6 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getServer().getPluginManager().registerEvents(new MarketCommandIntercept(auctionCmds, shopGui, sellCmds), this);
 
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
-		getServer().getPluginManager().registerEvents(new HoleFillerListener(), this);
 		getServer().getPluginManager().registerEvents(new InvincibleHelmetListener(), this);
 		getServer().getPluginManager().registerEvents(new GiveInterceptListener(), this);
 		getServer().getPluginManager().registerEvents(new MusicDiscListener(this), this);
@@ -170,7 +177,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Market ready: /sell GUI /ah /shop — OP: /sbshovel /holefiller");
+		getLogger().info("Market ready: /sell GUI /ah /shop — OP: /sbshovel /banhammer");
 	}
 
 	@Override
