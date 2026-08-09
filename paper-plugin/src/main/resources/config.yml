@@ -11,3 +11,7 @@ economy:
     title-color: 0
     balance-color: 1
     animation: false
+
+rtp:
+  # Seconds between RTPs for non-OP players
+  cooldown-seconds: 15

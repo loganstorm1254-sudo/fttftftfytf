@@ -168,6 +168,19 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getServer().getPluginManager().registerEvents(new EconomyListener(economy, economyScoreboard), this);
 		getServer().getPluginManager().registerEvents(new MarketCommandIntercept(auctionCmds, shopGui, sellCmds), this);
 
+		RtpService rtpService = new RtpService(this);
+		RtpGui rtpGui = new RtpGui(rtpService);
+		RtpCommand rtpCmd = new RtpCommand(rtpGui, rtpService);
+		PluginCommand rtp = getCommand("rtp");
+		if (rtp != null) {
+			rtp.setExecutor(rtpCmd);
+			rtp.setTabCompleter(rtpCmd);
+			getLogger().info("Registered /rtp");
+		} else {
+			getLogger().severe("Command /rtp missing from plugin.yml");
+		}
+		getServer().getPluginManager().registerEvents(rtpGui, this);
+
 		getServer().getPluginManager().registerEvents(new OpToolsListener(), this);
 		getServer().getPluginManager().registerEvents(new InvincibleHelmetListener(), this);
 		getServer().getPluginManager().registerEvents(new GiveInterceptListener(), this);
@@ -177,7 +190,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Market ready: /sell GUI /ah /shop — OP: /sbshovel /banhammer");
+		getLogger().info("Market ready: /sell /rtp /ah /shop — OP: /sbshovel /banhammer");
 	}
 
 	@Override

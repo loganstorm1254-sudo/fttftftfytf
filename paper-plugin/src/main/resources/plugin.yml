@@ -89,6 +89,10 @@ commands:
     description: Open DonutSMP-style sell menu (or sell hand/all)
     usage: /sell | /sell hand|all|price
     aliases: [cbsell]
+  rtp:
+    description: Random teleport — pick how many blocks away
+    usage: /rtp | /rtp <blocks>
+    aliases: [wild, randomtp, cbrtp]
 
 permissions:
   chunkboomerits.give:
@@ -133,6 +137,9 @@ permissions:
   chunkboomerits.sell:
     description: Sell items for dollars
     default: true
+  chunkboomerits.rtp:
+    description: Use /rtp random teleport
+    default: true
   chunkboomerits.*:
     description: All Chunk Boomerits tools
     default: op
@@ -151,3 +158,4 @@ permissions:
       chunkboomerits.auction: true
       chunkboomerits.shop: true
       chunkboomerits.sell: true
+      chunkboomerits.rtp: true
