@@ -12,6 +12,9 @@ import com.chunkboomerits.paper.economy.EconomyListener;
 import com.chunkboomerits.paper.economy.EconomyScoreboard;
 import com.chunkboomerits.paper.economy.EconomyService;
 import com.chunkboomerits.paper.economy.MarketCommandIntercept;
+import com.chunkboomerits.paper.economy.OrderService;
+import com.chunkboomerits.paper.economy.OrdersCommand;
+import com.chunkboomerits.paper.economy.OrdersGui;
 import com.chunkboomerits.paper.economy.ScoreboardEditorGui;
 import com.chunkboomerits.paper.economy.ScoreboardShovelListener;
 import com.chunkboomerits.paper.economy.SellCommands;
@@ -32,6 +35,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 	private ShopService shop;
 	private ShopGui shopGui;
 	private SellService sellService;
+	private OrderService orderService;
 	private AdminHubGui adminHubGui;
 	private FreezeService freezeService;
 
@@ -77,8 +81,10 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		auctions.load();
 		shop = new ShopService(this);
 		shop.load();
+		orderService = new OrderService(this);
+		orderService.load();
 
-		// Autosave market data every 5 minutes so a crash mid-session keeps shop/AH
+		// Autosave market data every 5 minutes so a crash mid-session keeps shop/AH/orders
 		getServer().getScheduler().runTaskTimer(this, () -> {
 			try {
 				if (shop != null) {
@@ -93,13 +99,17 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 				if (sellService != null) {
 					sellService.save();
 				}
+				if (orderService != null) {
+					orderService.save();
+				}
 			} catch (Exception ex) {
 				getLogger().warning("Autosave failed: " + ex.getMessage());
 			}
 		}, 20L * 60 * 5, 20L * 60 * 5);
 
 		getLogger().info("Market data folder (keep this when updating the jar): " + getDataFolder().getAbsolutePath());
-		getLogger().info("Loaded shop offers=" + shop.size() + " AH listings=" + auctions.size());
+		getLogger().info("Loaded shop offers=" + shop.size() + " AH listings=" + auctions.size()
+				+ " buy-orders=" + orderService.size());
 
 		EconomyCommands ecoCmds = new EconomyCommands(economy, economyScoreboard);
 		bindEco("bal", ecoCmds);
@@ -153,6 +163,21 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 			getLogger().info("Registered /cbsell");
 		}
 
+		OrdersGui ordersGui = new OrdersGui(orderService, economy, economyScoreboard);
+		OrdersCommand ordersCmds = new OrdersCommand(ordersGui);
+		PluginCommand ordersCmd = getCommand("orders");
+		if (ordersCmd != null) {
+			ordersCmd.setExecutor(ordersCmds);
+			getLogger().info("Registered /orders");
+		} else {
+			getLogger().severe("Command /orders missing from plugin.yml");
+		}
+		PluginCommand cborders = getCommand("cborders");
+		if (cborders != null) {
+			cborders.setExecutor(ordersCmds);
+			getLogger().info("Registered /cborders");
+		}
+
 		ScoreboardEditorGui editorGui = new ScoreboardEditorGui(economyScoreboard);
 		SellPricesAdminGui sellPricesGui = new SellPricesAdminGui(sellService, economy);
 		ShopAdminGui shopAdminGui = new ShopAdminGui(shop, economy);
@@ -165,9 +190,11 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		getServer().getPluginManager().registerEvents(auctionGui, this);
 		getServer().getPluginManager().registerEvents(shopGui, this);
 		getServer().getPluginManager().registerEvents(sellGui, this);
+		getServer().getPluginManager().registerEvents(ordersGui, this);
 		getServer().getPluginManager().registerEvents(new ScoreboardShovelListener(adminHubGui), this);
 		getServer().getPluginManager().registerEvents(new EconomyListener(economy, economyScoreboard), this);
-		getServer().getPluginManager().registerEvents(new MarketCommandIntercept(auctionCmds, shopGui, sellCmds), this);
+		getServer().getPluginManager().registerEvents(
+				new MarketCommandIntercept(auctionCmds, shopGui, sellCmds, ordersCmds), this);
 
 		RtpService rtpService = new RtpService(this);
 		RtpGui rtpGui = new RtpGui(rtpService);
@@ -213,7 +240,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		packs.setup();
 		getServer().getPluginManager().registerEvents(packs, this);
 
-		getLogger().info("Ready: /sell /rtp /ah /shop — OP: /freeze /unfreeze /sbshovel /banhammer");
+		getLogger().info("Ready: /sell /orders /rtp /ah /shop — OP: /freeze /unfreeze /sbshovel /banhammer");
 	}
 
 	@Override
@@ -229,6 +256,9 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		}
 		if (shop != null) {
 			shop.save();
+		}
+		if (orderService != null) {
+			orderService.save();
 		}
 		if (sellService != null) {
 			sellService.save();

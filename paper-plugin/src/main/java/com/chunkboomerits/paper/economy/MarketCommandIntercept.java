@@ -12,17 +12,20 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
 /**
- * Forces /ah and /shop to this plugin even if another plugin stole the names.
+ * Forces /ah, /shop, /sell, /orders to this plugin even if another plugin stole the names.
  */
 public final class MarketCommandIntercept implements Listener {
 	private final AuctionCommands auctionCommands;
 	private final ShopGui shopGui;
 	private final SellCommands sellCommands;
+	private final OrdersCommand ordersCommand;
 
-	public MarketCommandIntercept(AuctionCommands auctionCommands, ShopGui shopGui, SellCommands sellCommands) {
+	public MarketCommandIntercept(AuctionCommands auctionCommands, ShopGui shopGui, SellCommands sellCommands,
+			OrdersCommand ordersCommand) {
 		this.auctionCommands = auctionCommands;
 		this.shopGui = shopGui;
 		this.sellCommands = sellCommands;
+		this.ordersCommand = ordersCommand;
 	}
 
 	@EventHandler(priority = EventPriority.LOWEST)
@@ -69,6 +72,11 @@ public final class MarketCommandIntercept implements Listener {
 		if (label.equals("sell") || label.equals("cbsell")) {
 			event.setCancelled(true);
 			sellCommands.handle(player, args);
+			return;
+		}
+		if (label.equals("orders") || label.equals("order") || label.equals("cborders") || label.equals("buyorder")) {
+			event.setCancelled(true);
+			ordersCommand.handle(player, args);
 		}
 	}
 }
