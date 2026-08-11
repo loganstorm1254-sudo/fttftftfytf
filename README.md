@@ -1,1 +1,66 @@
-# fttftftfytf
+# Chunk Boomerits + Economy + AH + Shop + Sell + Orders
+
+**Paper / Purpur 1.21.11 — jar `1.9.1`**
+
+## Install
+1. Delete ALL old ChunkBoomerits jars from `plugins/`
+2. Put `dist/ChunkBoomerits-1.9.1.jar` in `plugins/`
+3. **Fully restart** (not `/reload`)
+4. Keep `plugins/ChunkBoomerits/` when updating (shop/AH/economy/sell prices/orders)
+
+## Anti-flip (/shop → /sell)
+- Items bought from `/shop` are tagged and **cannot be `/sell`'d**
+- `/sell` payout for a material is capped at the cheapest `/shop` unit price for that material
+- `/shopadd` refuses listings cheaper than the item's `/sell` value
+
+## Orders (buy orders)
+```
+/orders            # browse open buy orders — click to fulfill (get paid)
+/orders mine       # your orders — claim deliveries / cancel (refund escrow)
+```
+Hold an item → **Create buy order** → type how many → type price each.  
+Money is escrowed up front. You can place **multiple orders for the same item**.  
+Others deliver matching items from their inventory and receive the payout.  
+Buyer claims delivered items from **My orders**.
+
+## Sell (DonutSMP-scale prices)
+```
+/sell            # open sell menu — put items in the grid, click green SELL
+/sell hand       # sell item in hand
+/sell all        # sell all sellable items in inventory
+/sell price      # check fixed price of held item
+```
+Prices follow donut.build / DonutSMP auction scale (e.g. oak log `$300`, sand `$100`, diamond `$1,200`, leather `$10,000`, ancient debris `$1,700,000`).
+
+**OP shovel** (`/sbshovel`): Admin hub → **Sell Prices** — edit every item's `/sell` price.
+
+## Freeze (OP)
+```
+/freeze <player>     # freeze one player
+/freeze all          # freeze everyone (except you)
+/unfreeze <player>   # unfreeze one player
+/unfreeze all        # unfreeze everyone
+```
+Frozen players can't move/interact. A **Frozen** hologram appears above their head.
+
+## RTP
+```
+/rtp              # open distance GUI
+/rtp 1000         # skip GUI — go ~1000 blocks away
+/rtp 5k           # same as 5000
+```
+GUI options: **500 · 1,000 · 2,500 · 5,000 · 10,000 · 25,000** blocks away from you.
+
+## Ban Sword (OP)
+```
+/banhammer <duration> [player]
+```
+Wooden Ban Sword — hit a player to ban them (works in creative).  
+Durations: `1s` `1m` `1h` `1d` `7d` `perm`
+
+## Auction / Shop / Economy
+```
+/ah  /ah sell <price>
+/shop  /shopadd <price>
+/bal  /pay  /eco  /baltop
+```

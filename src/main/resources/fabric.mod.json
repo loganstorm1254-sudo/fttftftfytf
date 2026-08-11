@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "chunkboomerits",
+	"version": "${version}",
+	"name": "Chunk Boomerits",
+	"description": "OP-only Chunk Boomerits ball — throw it to delete a chunk. Use /chunkboomerits",
+	"authors": [
+		"Logan"
+	],
+	"contact": {},
+	"license": "MIT",
+	"icon": "assets/chunkboomerits/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.chunkboomerits.ChunkBoomeritsMod"
+		],
+		"client": [
+			"com.chunkboomerits.client.ChunkBoomeritsClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

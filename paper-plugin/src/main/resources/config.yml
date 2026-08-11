@@ -1,0 +1,17 @@
+resource-pack:
+  # After you push, set this to the raw GitHub zip URL so players get the pack automatically.
+  url: "https://github.com/loganstorm1254-sudo/fttftftfytf/raw/cursor/chunk-boomerits-mod-8927/dist/ChunkBoomerits-RP.zip"
+  push-on-join: true
+
+economy:
+  starting-balance: 1000.0
+  scoreboard:
+    enabled: true
+    title: "Economy"
+    title-color: 0
+    balance-color: 1
+    animation: false
+
+rtp:
+  # Seconds between RTPs for non-OP players
+  cooldown-seconds: 15
