@@ -122,6 +122,30 @@ public final class ShopService {
 		return offer;
 	}
 
+	/**
+	 * Lowest per-item shop price for this material, or null if none listed.
+	 * Used to stop /shop → /sell flipping of the same material.
+	 */
+	public synchronized Double lowestUnitPrice(org.bukkit.Material material) {
+		if (material == null || material.isAir()) {
+			return null;
+		}
+		double lowest = Double.POSITIVE_INFINITY;
+		boolean found = false;
+		for (Offer offer : offers.values()) {
+			ItemStack stack = offer.itemCopy();
+			if (stack.getType() != material || stack.getAmount() <= 0) {
+				continue;
+			}
+			double unit = offer.price() / stack.getAmount();
+			if (unit < lowest) {
+				lowest = unit;
+				found = true;
+			}
+		}
+		return found ? Math.round(lowest * 100.0) / 100.0 : null;
+	}
+
 	public synchronized Offer get(int id) {
 		return offers.get(id);
 	}

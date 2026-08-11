@@ -161,9 +161,13 @@ public final class ShopGui implements Listener {
 				player.sendMessage(Component.text("Payment failed.", NamedTextColor.RED));
 				return;
 			}
-			AuctionGui.giveOrDrop(player, product);
+			ItemStack tagged = ShopPurchase.mark(product);
+			AuctionGui.giveOrDrop(player, tagged);
 			scoreboard.refresh(player);
-			player.sendMessage(Component.text("Purchased for " + economy.format(price) + "! (still in shop)", NamedTextColor.GREEN));
+			player.sendMessage(Component.text(
+					"Purchased for " + economy.format(price) + "! (shop items can't be /sell'd)",
+					NamedTextColor.GREEN
+			));
 
 			// Refresh balance only — do NOT remove the shop listing from the GUI.
 			if (player.getOpenInventory().getTopInventory().getHolder() instanceof GuiHolder h

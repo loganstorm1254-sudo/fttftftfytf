@@ -51,6 +51,17 @@ public final class ShopAddCommand implements CommandExecutor {
 		}
 		ShopService shop = ChunkBoomeritsPlugin.get().shop();
 		EconomyService economy = ChunkBoomeritsPlugin.get().economy();
+		SellService sell = ChunkBoomeritsPlugin.get().sellService();
+		double sellValue = sell.configuredValue(hand);
+		if (sellValue > 0 && price < sellValue) {
+			player.sendMessage(Component.text(
+					"Blocked: that would let players flip /shop → /sell for profit. "
+							+ "Shop price must be at least " + economy.format(sellValue)
+							+ " (current /sell value), or lower the sell price with /sbshovel.",
+					NamedTextColor.RED
+			));
+			return true;
+		}
 		ShopService.Offer offer = shop.add(price, hand.clone());
 		player.sendMessage(Component.text(
 				"Added " + hand.getAmount() + "x " + hand.getType().name() + " to /shop for " + economy.format(price)

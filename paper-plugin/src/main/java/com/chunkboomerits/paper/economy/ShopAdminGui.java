@@ -187,6 +187,17 @@ public final class ShopAdminGui implements Listener {
 				open(player);
 				return;
 			}
+			SellService sell = ChunkBoomeritsPlugin.get().sellService();
+			double sellValue = sell.configuredValue(item);
+			if (sellValue > 0 && price < sellValue) {
+				player.sendMessage(Component.text(
+						"Blocked: shop price must be ≥ /sell value (" + economy.format(sellValue)
+								+ ") or players can flip for profit.",
+						NamedTextColor.RED
+				));
+				open(player);
+				return;
+			}
 			ShopService.Offer offer = shop.add(price, item);
 			player.sendMessage(Component.text(
 					"Added " + item.getAmount() + "x " + item.getType().name() + " to /shop for " + economy.format(price)

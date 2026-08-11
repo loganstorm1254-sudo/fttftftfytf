@@ -130,7 +130,11 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 			return true;
 		}
 		if (!sell.isSellable(hand)) {
-			player.sendMessage(Component.text("You can't sell " + pretty(hand.getType()) + ".", NamedTextColor.RED));
+			if (ShopPurchase.isMarked(hand)) {
+				player.sendMessage(Component.text("Shop purchases can't be sold — no flipping.", NamedTextColor.RED));
+			} else {
+				player.sendMessage(Component.text("You can't sell " + pretty(hand.getType()) + ".", NamedTextColor.RED));
+			}
 			return true;
 		}
 		double payout = sell.priceOf(hand);
@@ -196,6 +200,10 @@ public final class SellCommands implements CommandExecutor, TabCompleter {
 			return true;
 		}
 		Double unit = sell.priceOf(hand.getType());
+		if (ShopPurchase.isMarked(hand)) {
+			player.sendMessage(Component.text("Shop purchase — cannot /sell (no flipping).", NamedTextColor.RED));
+			return true;
+		}
 		if (unit == null || !sell.isSellable(hand)) {
 			player.sendMessage(Component.text(pretty(hand.getType()) + " cannot be sold.", NamedTextColor.RED));
 			return true;

@@ -25,6 +25,7 @@ import com.chunkboomerits.paper.economy.ShopAddCommand;
 import com.chunkboomerits.paper.economy.ShopAdminGui;
 import com.chunkboomerits.paper.economy.ShopCommands;
 import com.chunkboomerits.paper.economy.ShopGui;
+import com.chunkboomerits.paper.economy.ShopPurchase;
 import com.chunkboomerits.paper.economy.ShopService;
 
 public final class ChunkBoomeritsPlugin extends JavaPlugin {
@@ -44,6 +45,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		instance = this;
 		saveDefaultConfig();
 		OpItems.init(this);
+		ShopPurchase.init(this);
 
 		bind("chunkboomerits", OpGiveCommand.boomerits());
 		bind("givechunkboomerits", OpGiveCommand.boomerits());
@@ -148,6 +150,7 @@ public final class ChunkBoomeritsPlugin extends JavaPlugin {
 		SellService sellService = new SellService(this);
 		this.sellService = sellService;
 		sellService.load();
+		sellService.bindShop(shop);
 		SellGui sellGui = new SellGui(sellService, economy, economyScoreboard);
 		SellCommands sellCmds = new SellCommands(sellService, economy, economyScoreboard, sellGui);
 		PluginCommand sellCmd = getCommand("sell");

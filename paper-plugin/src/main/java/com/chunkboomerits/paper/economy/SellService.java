@@ -27,10 +27,16 @@ public final class SellService {
 	private final ChunkBoomeritsPlugin plugin;
 	private final File file;
 	private final Map<Material, Double> prices = new LinkedHashMap<>();
+	private ShopService shop;
 
 	public SellService(ChunkBoomeritsPlugin plugin) {
 		this.plugin = plugin;
 		this.file = new File(plugin.getDataFolder(), "sell-prices.yml");
+	}
+
+	/** Wire shop after both services exist — caps /sell under cheap /shop listings. */
+	public void bindShop(ShopService shop) {
+		this.shop = shop;
 	}
 
 	public void load() {
@@ -119,7 +125,11 @@ public final class SellService {
 	}
 
 	public Double priceOf(Material material) {
-		return prices.get(material);
+		Double base = prices.get(material);
+		if (base == null) {
+			return null;
+		}
+		return cappedUnit(material, base);
 	}
 
 	/** OP / shovel: set or change a material's /sell price (0 = not sellable). */
@@ -151,7 +161,7 @@ public final class SellService {
 		if (stack == null || stack.getType().isAir() || !isSellable(stack)) {
 			return 0;
 		}
-		Double unit = prices.get(stack.getType());
+		Double unit = priceOf(stack.getType());
 		if (unit == null) {
 			return 0;
 		}
@@ -162,13 +172,47 @@ public final class SellService {
 		if (stack == null || stack.getType().isAir()) {
 			return false;
 		}
+		if (ShopPurchase.isMarked(stack)) {
+			return false;
+		}
 		if (OpItems.isBoomerits(stack) || OpItems.isKickSword(stack) || OpItems.isKillHammer(stack)
 				|| OpItems.isInvincibleHelmet(stack) || OpItems.isScoreboardShovel(stack)
 				|| OpItems.isBanSword(stack) || OpItems.isCustomDisc(stack)) {
 			return false;
 		}
-		Double price = prices.get(stack.getType());
+		Double price = priceOf(stack.getType());
 		return price != null && price > 0;
+	}
+
+	/**
+	 * Configured sell price before shop anti-flip cap (for /shopadd checks).
+	 */
+	public Double configuredPriceOf(Material material) {
+		return prices.get(material);
+	}
+
+	/** Full /sell value of a stack using configured prices (ignores shop cap + shop-purchase mark). */
+	public double configuredValue(ItemStack stack) {
+		if (stack == null || stack.getType().isAir()) {
+			return 0;
+		}
+		Double unit = prices.get(stack.getType());
+		if (unit == null || unit <= 0) {
+			return 0;
+		}
+		return round(unit * stack.getAmount());
+	}
+
+	private Double cappedUnit(Material material, double base) {
+		if (shop == null || base <= 0) {
+			return round(base);
+		}
+		Double shopUnit = shop.lowestUnitPrice(material);
+		if (shopUnit == null || shopUnit <= 0) {
+			return round(base);
+		}
+		// Never pay more via /sell than the cheapest /shop listing for that material.
+		return round(Math.min(base, shopUnit));
 	}
 
 	public Map<Material, Double> allPrices() {

@@ -1,12 +1,17 @@
 # Chunk Boomerits + Economy + AH + Shop + Sell + Orders
 
-**Paper / Purpur 1.21.11 — jar `1.9.0`**
+**Paper / Purpur 1.21.11 — jar `1.9.1`**
 
 ## Install
 1. Delete ALL old ChunkBoomerits jars from `plugins/`
-2. Put `dist/ChunkBoomerits-1.9.0.jar` in `plugins/`
+2. Put `dist/ChunkBoomerits-1.9.1.jar` in `plugins/`
 3. **Fully restart** (not `/reload`)
 4. Keep `plugins/ChunkBoomerits/` when updating (shop/AH/economy/sell prices/orders)
+
+## Anti-flip (/shop → /sell)
+- Items bought from `/shop` are tagged and **cannot be `/sell`'d**
+- `/sell` payout for a material is capped at the cheapest `/shop` unit price for that material
+- `/shopadd` refuses listings cheaper than the item's `/sell` value
 
 ## Orders (buy orders)
 ```
