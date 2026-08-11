@@ -1,0 +1,184 @@
+name: ChunkBoomerits
+version: '${version}'
+main: com.chunkboomerits.paper.ChunkBoomeritsPlugin
+api-version: '1.21'
+authors: [Logan]
+description: OP tools, dollar economy, and custom music discs for Paper/Purpur 1.21.11
+website: https://github.com/loganstorm1254-sudo/fttftftfytf
+
+# NOTE: Do not set "permission:" on commands — Paper hides them from tab-complete.
+commands:
+  chunkboomerits:
+    description: Give Chunk Boomerits (OP only)
+    usage: /chunkboomerits [player] [amount]
+    aliases: [boomerits, cboomerits]
+  givechunkboomerits:
+    description: Alias for giving Chunk Boomerits
+    usage: /givechunkboomerits <player> [amount]
+  kicksword:
+    description: Give the Kick Sword (OP only)
+    usage: /kicksword [player]
+    aliases: [kick_sword, opkicksword]
+  killhammer:
+    description: Give the Insta Kill Hammer (OP only)
+    usage: /killhammer [player]
+    aliases: [instakillhammer, cbhammer]
+  invhelmet:
+    description: Give the Invincible Copper Helmet (OP only)
+    usage: /invhelmet [player]
+    aliases: [invinciblehelmet, cbcopperhelmet]
+  sbshovel:
+    description: Give the Scoreboard Shovel (OP only)
+    usage: /sbshovel [player]
+    aliases: [scoreboardshovel, ecoshovel]
+  banhammer:
+    description: Give a wooden Ban Sword with a ban duration (OP only)
+    usage: /banhammer <duration> [player]
+    aliases: [bansword, cbbanhammer]
+  despacito:
+    description: Give the Despacito music disc
+    usage: /despacito [player]
+    aliases: [despacitodisc, musicdiscdespacito]
+  moskau:
+    description: Give the Moskau music disc
+    usage: /moskau [player]
+    aliases: [moskaudisc, dschinghiskhan]
+  kimjonggoon:
+    description: Give the Kim Jong Goon music disc
+    usage: /kimjonggoon [player]
+    aliases: [kimjong, hyperbaiter, kimjonggoondisc]
+  cbgive:
+    description: Give any Chunk Boomerits OP item
+    usage: /cbgive <item> [player]
+  bal:
+    description: Check your dollar balance
+    usage: /bal [player]
+    aliases: [money, cash]
+  balance:
+    description: Check your dollar balance
+    usage: /balance [player]
+  pay:
+    description: Pay another player
+    usage: /pay <player> <amount>
+  eco:
+    description: Manage balances (OP)
+    usage: /eco <give|take|set> <player> <amount>
+    aliases: [economy]
+  baltop:
+    description: Top balances
+    usage: /baltop [amount]
+  ah:
+    description: Auction house
+    usage: /ah | /ah sell <price>
+    aliases: [auction, auctions]
+  cbah:
+    description: Auction house (alias that avoids conflicts)
+    usage: /cbah | /cbah sell <price>
+  shop:
+    description: Server shop
+    usage: /shop
+    aliases: [store]
+  cbshop:
+    description: Server shop (alias that avoids conflicts)
+    usage: /cbshop
+  shopadd:
+    description: OP — add held item to /shop
+    usage: /shopadd <price>
+    aliases: [cbshopadd]
+  sell:
+    description: Open DonutSMP-style sell menu (or sell hand/all)
+    usage: /sell | /sell hand|all|price
+    aliases: [cbsell]
+  orders:
+    description: Buy orders — place requests or fulfill others for money
+    usage: /orders | /orders mine
+    aliases: [order, buyorder]
+  cborders:
+    description: Buy orders (alias that avoids conflicts)
+    usage: /cborders | /cborders mine
+  rtp:
+    description: Random teleport — pick how many blocks away
+    usage: /rtp | /rtp <blocks>
+    aliases: [wild, randomtp, cbrtp]
+  freeze:
+    description: Freeze a player or everyone (OP)
+    usage: /freeze <player|all>
+    aliases: [cbfreeze]
+  unfreeze:
+    description: Unfreeze a player or everyone (OP)
+    usage: /unfreeze <player|all>
+    aliases: [thaw, cbunfreeze]
+
+permissions:
+  chunkboomerits.give:
+    description: Give and use Chunk Boomerits
+    default: op
+  chunkboomerits.use:
+    description: Throw Chunk Boomerits to delete chunks
+    default: op
+  chunkboomerits.kicksword:
+    description: Give and use the Kick Sword
+    default: op
+  chunkboomerits.killhammer:
+    description: Give and use the Insta Kill Hammer
+    default: op
+  chunkboomerits.invhelmet:
+    description: Give the Invincible Copper Helmet
+    default: op
+  chunkboomerits.scoreboard:
+    description: Use the Scoreboard Shovel editor
+    default: op
+  chunkboomerits.banhammer:
+    description: Give and use the Ban Sword
+    default: op
+  chunkboomerits.disc:
+    description: Give custom music discs
+    default: true
+  chunkboomerits.economy.bal:
+    description: Check balances
+    default: true
+  chunkboomerits.economy.pay:
+    description: Pay other players
+    default: true
+  chunkboomerits.economy.eco:
+    description: Admin economy commands
+    default: op
+  chunkboomerits.auction:
+    description: Use the auction house
+    default: true
+  chunkboomerits.shop:
+    description: Use the server shop
+    default: true
+  chunkboomerits.sell:
+    description: Sell items for dollars
+    default: true
+  chunkboomerits.orders:
+    description: Place and fulfill buy orders
+    default: true
+  chunkboomerits.rtp:
+    description: Use /rtp random teleport
+    default: true
+  chunkboomerits.freeze:
+    description: Freeze and unfreeze players
+    default: op
+  chunkboomerits.*:
+    description: All Chunk Boomerits tools
+    default: op
+    children:
+      chunkboomerits.give: true
+      chunkboomerits.use: true
+      chunkboomerits.kicksword: true
+      chunkboomerits.killhammer: true
+      chunkboomerits.invhelmet: true
+      chunkboomerits.scoreboard: true
+      chunkboomerits.banhammer: true
+      chunkboomerits.disc: true
+      chunkboomerits.economy.bal: true
+      chunkboomerits.economy.pay: true
+      chunkboomerits.economy.eco: true
+      chunkboomerits.auction: true
+      chunkboomerits.shop: true
+      chunkboomerits.sell: true
+      chunkboomerits.orders: true
+      chunkboomerits.rtp: true
+      chunkboomerits.freeze: true

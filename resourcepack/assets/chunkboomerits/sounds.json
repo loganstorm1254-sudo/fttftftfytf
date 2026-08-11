@@ -1,0 +1,29 @@
+{
+  "music_disc.despacito": {
+    "sounds": [
+      {
+        "name": "chunkboomerits:records/despacito",
+        "stream": true,
+        "volume": 1.0
+      }
+    ]
+  },
+  "music_disc.moskau": {
+    "sounds": [
+      {
+        "name": "chunkboomerits:records/moskau",
+        "stream": true,
+        "volume": 1.0
+      }
+    ]
+  },
+  "music_disc.kim_jong_goon": {
+    "sounds": [
+      {
+        "name": "chunkboomerits:records/kim_jong_goon",
+        "stream": true,
+        "volume": 1.0
+      }
+    ]
+  }
+}
